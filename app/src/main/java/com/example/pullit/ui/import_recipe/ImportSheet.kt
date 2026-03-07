@@ -73,20 +73,6 @@ fun ImportSheet(
             .padding(horizontal = 20.dp)
             .padding(bottom = 32.dp)
     ) {
-        // Drag handle
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(36.dp)
-                    .height(5.dp)
-                    .clip(RoundedCornerShape(2.5.dp))
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
-            )
-        }
-
         // Title
         Text(
             S.importRecipe,

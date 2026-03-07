@@ -75,12 +75,20 @@ fun CookbookDetailScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Outlined.MenuBook,
-                        contentDescription = null,
-                        modifier = Modifier.size(56.dp),
-                        tint = TextTertiary
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Primary.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Outlined.MenuBook,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = Primary
+                        )
+                    }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         S.emptyCookbook,

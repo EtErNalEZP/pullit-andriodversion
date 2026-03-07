@@ -99,12 +99,20 @@ fun AiRecommendScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(32.dp)
                     ) {
-                        Icon(
-                            Icons.Outlined.AutoAwesome,
-                            contentDescription = null,
-                            modifier = Modifier.size(56.dp),
-                            tint = TextTertiary
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(CircleShape)
+                                .background(Primary.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Outlined.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp),
+                                tint = Primary
+                            )
+                        }
                         Spacer(modifier = Modifier.height(20.dp))
                         Text(
                             S.aiIngredientRecognition,
@@ -175,39 +183,42 @@ fun AiRecommendScreen(
                                 onClick = { selectedSuggestionIndex = index },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(
+                                Row(
                                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        suggestion.title,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 16.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        suggestion.description,
-                                        color = TextSecondary,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        "${S.ingredients}: ${suggestion.ingredients.joinToString(", ")}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = TextSecondary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    if (suggestion.steps.isNotEmpty()) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
                                         Text(
-                                            "${suggestion.steps.first()}...",
+                                            suggestion.title,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 16.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            suggestion.description,
+                                            color = TextSecondary,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            "${S.ingredients}: ${suggestion.ingredients.joinToString(", ")}",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = TextTertiary,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                     }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Icon(
+                                        Icons.Filled.ChevronRight,
+                                        contentDescription = null,
+                                        tint = TextTertiary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
                             }
                             HorizontalDivider(
@@ -417,12 +428,20 @@ fun AiRecommendScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(32.dp)
                     ) {
-                        Icon(
-                            Icons.Default.Warning,
-                            contentDescription = null,
-                            modifier = Modifier.size(56.dp),
-                            tint = TextTertiary
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .clip(CircleShape)
+                                .background(Error.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                modifier = Modifier.size(40.dp),
+                                tint = Error
+                            )
+                        }
                         Spacer(modifier = Modifier.height(20.dp))
                         Text(
                             S.somethingWentWrong,
@@ -585,7 +604,7 @@ private fun SuggestionDetailSheet(
         item {
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = Primary.copy(alpha = 0.05f),
+                color = Primary.copy(alpha = 0.08f),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(

@@ -834,12 +834,14 @@ fun RecipeDetailScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .height(IntrinsicSize.Min)
                             .padding(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         // Number circle + connector line
                         Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.fillMaxHeight()
                         ) {
                             Surface(
                                 shape = CircleShape,
@@ -859,10 +861,7 @@ fun RecipeDetailScreen(
                                 Box(
                                     modifier = Modifier
                                         .width(2.dp)
-                                        .height(
-                                            // Variable height connector
-                                            if (step.instruction.length > 100) 120.dp else 60.dp
-                                        )
+                                        .weight(1f)
                                         .drawBehind {
                                             drawLine(
                                                 color = borderColor,
@@ -879,7 +878,7 @@ fun RecipeDetailScreen(
                         Column(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(bottom = if (index < steps.size - 1) 16.dp else 0.dp)
+                                .padding(bottom = if (index < steps.size - 1) 20.dp else 0.dp)
                         ) {
                             Text(
                                 text = buildHighlightedText(step.instruction, ingredientNames),

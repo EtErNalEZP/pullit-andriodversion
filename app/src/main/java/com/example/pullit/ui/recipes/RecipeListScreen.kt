@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -159,34 +160,38 @@ fun RecipeListScreen(
                     // Segmented buttons for tabs
                     Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(10.dp))
                             .background(MaterialTheme.colorScheme.surfaceVariant)
                             .weight(1f)
+                            .padding(3.dp)
                     ) {
                         RecipeTab.entries.forEach { tab ->
                             val isActive = selectedTab == tab
-                            Box(
+                            val bgColor by animateColorAsState(
+                                if (isActive) MaterialTheme.colorScheme.surface else Color.Transparent,
+                                label = "tab_bg"
+                            )
+                            Surface(
+                                onClick = { selectedTab = tab },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (isActive) Primary
-                                        else Color.Transparent
-                                    )
-                                    .clickable { selectedTab = tab }
-                                    .padding(vertical = 8.dp),
-                                contentAlignment = Alignment.Center
+                                    .height(32.dp),
+                                shape = RoundedCornerShape(8.dp),
+                                color = bgColor,
+                                shadowElevation = if (isActive) 1.dp else 0.dp
                             ) {
-                                Text(
-                                    text = when (tab) {
-                                        RecipeTab.ALL_RECIPES -> S.allRecipes
-                                        RecipeTab.COOKBOOKS -> S.cookbooks
-                                    },
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
-                                    color = if (isActive) Color.White
-                                    else MaterialTheme.colorScheme.onSurface
-                                )
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = when (tab) {
+                                            RecipeTab.ALL_RECIPES -> S.allRecipes
+                                            RecipeTab.COOKBOOKS -> S.cookbooks
+                                        },
+                                        fontSize = 13.sp,
+                                        fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                        color = if (isActive) MaterialTheme.colorScheme.onSurface
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
@@ -862,12 +867,20 @@ private fun CookbookListContent(
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    Icons.Outlined.MenuBook,
-                    contentDescription = null,
-                    modifier = Modifier.size(56.dp),
-                    tint = TextTertiary
-                )
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Primary.copy(alpha = 0.1f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.MenuBook,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp),
+                        tint = Primary
+                    )
+                }
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     S.noCookbooks,
@@ -892,8 +905,10 @@ private fun CookbookListContent(
             }
         }
     } else {
-        Column {
-            cookbooks.forEach { cookbook ->
+        LazyColumn(
+            contentPadding = PaddingValues(bottom = 80.dp)
+        ) {
+            items(cookbooks, key = { it.id }) { cookbook ->
                 val recipes = viewModel.recipesForCookbook(cookbook)
                 val favoriteCount = recipes.count { it.favorited }
 
@@ -998,29 +1013,22 @@ private fun CookbookListContent(
                                         }
                                     } else {
                                         // Empty placeholder with dashed border
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .background(Color.Transparent),
-                                            contentAlignment = Alignment.Center
+                                        Surface(
+                                            modifier = Modifier.fillMaxSize(),
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = Color.Transparent,
+                                            border = BorderStroke(
+                                                1.dp,
+                                                TextTertiary.copy(alpha = 0.3f)
+                                            )
                                         ) {
-                                            Surface(
-                                                modifier = Modifier.fillMaxSize(),
-                                                shape = RoundedCornerShape(8.dp),
-                                                color = Color.Transparent,
-                                                border = androidx.compose.foundation.BorderStroke(
-                                                    1.dp,
-                                                    TextTertiary.copy(alpha = 0.3f)
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    Icons.Default.Add,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(12.dp),
+                                                    tint = TextTertiary.copy(alpha = 0.4f)
                                                 )
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Icon(
-                                                        Icons.Default.Add,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(12.dp),
-                                                        tint = TextTertiary.copy(alpha = 0.4f)
-                                                    )
-                                                }
                                             }
                                         }
                                     }
@@ -1038,25 +1046,27 @@ private fun CookbookListContent(
             }
 
             // Add cookbook button
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showCreateDialog = true }
-                    .padding(vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = Primary
-                )
-                Text(
-                    S.createCookbook,
-                    fontSize = 15.sp,
-                    color = Primary
-                )
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showCreateDialog = true }
+                        .padding(vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = Primary
+                    )
+                    Text(
+                        S.createCookbook,
+                        fontSize = 15.sp,
+                        color = Primary
+                    )
+                }
             }
         }
     }
