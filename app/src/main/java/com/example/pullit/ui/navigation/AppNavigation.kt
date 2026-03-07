@@ -79,7 +79,7 @@ fun AppNavigation(authManager: AuthManager) {
         BottomNavItem(Screen.RecipeList, S.recipes, Icons.Filled.MenuBook, Icons.Outlined.MenuBook),
         BottomNavItem(Screen.MealPlan, S.mealPlan, Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth),
         BottomNavItem(Screen.AiRecommend, "AI", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome),
-        BottomNavItem(Screen.More, S.more, Icons.Filled.MoreHoriz, Icons.Outlined.MoreHoriz)
+        BottomNavItem(Screen.More, S.more, Icons.Filled.Settings, Icons.Outlined.Settings)
     )
     val isAuthenticated by authManager.isAuthenticated.collectAsState()
     val isLoading by authManager.isLoading.collectAsState()
