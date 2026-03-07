@@ -1,8 +1,10 @@
 package com.example.pullit.ui.recipes
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,22 +18,28 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import com.example.pullit.data.model.Recipe
-import com.example.pullit.ui.navigation.Screen
 import com.example.pullit.ui.LocalStrings
+import com.example.pullit.ui.navigation.Screen
 import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.RecipeListViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,10 +51,10 @@ fun RouletteScreen(
     val recipes by viewModel.recipes.collectAsState()
     val cookbooks by viewModel.cookbooks.collectAsState()
     var selectedCookbookId by remember { mutableStateOf<String?>(null) }
-    var selectedIndex by remember { mutableIntStateOf(-1) }
-    var hasSpun by remember { mutableStateOf(false) }
+    var isShuffling by remember { mutableStateOf(false) }
+    var hasResult by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
-    // Filter recipes based on selected cookbook
     val filteredRecipes = remember(recipes, cookbooks, selectedCookbookId) {
         if (selectedCookbookId == null) {
             recipes
@@ -61,13 +69,57 @@ fun RouletteScreen(
         }
     }
 
+    val slotCount = maxOf(filteredRecipes.size, 11)
+    val scrollPosition = remember { Animatable(0f) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val effectiveScroll = scrollPosition.value + dragOffset
+
+    fun recipeIndex(scroll: Float): Int {
+        val count = filteredRecipes.size
+        if (count == 0) return 0
+        var slot = (round(scroll).toInt()) % slotCount
+        if (slot < 0) slot += slotCount
+        return slot % count
+    }
+
+    fun shuffle() {
+        if (isShuffling || filteredRecipes.isEmpty()) return
+        isShuffling = true
+        hasResult = false
+
+        val targetRecipe = (0 until filteredRecipes.size).random()
+        val currentSlot = round(scrollPosition.value).toInt() % slotCount
+        val currentRecipe = if (filteredRecipes.isNotEmpty()) currentSlot % filteredRecipes.size else 0
+        var distance = targetRecipe - currentRecipe
+        if (distance <= 0) distance += filteredRecipes.size
+        distance += slotCount * (3 + (0..1).random())
+
+        scope.launch {
+            scrollPosition.animateTo(
+                targetValue = scrollPosition.value + distance.toFloat(),
+                animationSpec = spring(
+                    dampingRatio = 0.92f,
+                    stiffness = 12f
+                )
+            )
+            delay(200)
+            isShuffling = false
+            hasResult = true
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(S.recipeRoulette, fontWeight = FontWeight.Bold) },
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(S.recipeRoulette, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(S.spinToPick, fontSize = 11.sp, color = TextSecondary)
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, S.back)
                     }
                 }
             )
@@ -90,7 +142,13 @@ fun RouletteScreen(
                 ) {
                     FilterChip(
                         selected = selectedCookbookId == null,
-                        onClick = { selectedCookbookId = null; selectedIndex = -1; hasSpun = false },
+                        onClick = {
+                            if (!isShuffling) {
+                                selectedCookbookId = null
+                                hasResult = false
+                                scope.launch { scrollPosition.snapTo(0f) }
+                            }
+                        },
                         label = { Text(S.allRecipes) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = Primary,
@@ -103,7 +161,13 @@ fun RouletteScreen(
                     cookbooks.forEach { cookbook ->
                         FilterChip(
                             selected = selectedCookbookId == cookbook.id,
-                            onClick = { selectedCookbookId = cookbook.id; selectedIndex = -1; hasSpun = false },
+                            onClick = {
+                                if (!isShuffling) {
+                                    selectedCookbookId = cookbook.id
+                                    hasResult = false
+                                    scope.launch { scrollPosition.snapTo(0f) }
+                                }
+                            },
                             label = { Text(cookbook.title) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = Primary,
@@ -117,10 +181,9 @@ fun RouletteScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.weight(0.3f))
+            Spacer(modifier = Modifier.weight(0.15f))
 
             if (filteredRecipes.isEmpty()) {
-                // Empty state
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(32.dp)
@@ -132,53 +195,132 @@ fun RouletteScreen(
                         tint = TextTertiary
                     )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        S.noRecipesToSpin,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        S.addSomeRecipes,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextTertiary
-                    )
+                    Text(S.noRecipesToSpin, style = MaterialTheme.typography.titleMedium, color = TextSecondary)
+                    Text(S.addSomeRecipes, style = MaterialTheme.typography.bodyMedium, color = TextTertiary)
                 }
             } else {
-                // Large recipe card (210x290dp)
-                val currentRecipe = if (hasSpun && selectedIndex in filteredRecipes.indices)
-                    filteredRecipes[selectedIndex] else null
+                // 3D Card Carousel
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(350.dp)
+                        .pointerInput(isShuffling) {
+                            if (!isShuffling) {
+                                detectHorizontalDragGestures(
+                                    onDragEnd = {
+                                        val snap = round(dragOffset).toFloat()
+                                        val finalPos = scrollPosition.value + snap
+                                        dragOffset = 0f
+                                        scope.launch {
+                                            scrollPosition.snapTo(finalPos)
+                                            scrollPosition.animateTo(
+                                                targetValue = round(scrollPosition.value),
+                                                animationSpec = spring(
+                                                    dampingRatio = 0.75f,
+                                                    stiffness = Spring.StiffnessMedium
+                                                )
+                                            )
+                                        }
+                                    },
+                                    onDragCancel = {
+                                        val snap = round(dragOffset).toFloat()
+                                        dragOffset = 0f
+                                        scope.launch { scrollPosition.snapTo(scrollPosition.value + snap) }
+                                    },
+                                    onHorizontalDrag = { _, dragAmount ->
+                                        dragOffset += -dragAmount / 75f
+                                    }
+                                )
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    for (slot in 0 until slotCount) {
+                        val recIdx = if (filteredRecipes.isNotEmpty()) slot % filteredRecipes.size else 0
+                        val recipe = filteredRecipes[recIdx]
 
-                AnimatedContent(
-                    targetState = currentRecipe,
-                    transitionSpec = {
-                        (fadeIn(tween(300)) + scaleIn(tween(300), initialScale = 0.92f))
-                            .togetherWith(fadeOut(tween(200)))
-                    },
-                    label = "roulette_card"
-                ) { recipe ->
-                    RouletteCard(recipe = recipe, modifier = Modifier.size(210.dp, 290.dp))
+                        // Calculate relative position with wrapping
+                        var pos = (slot.toFloat() - effectiveScroll) % slotCount.toFloat()
+                        if (pos > slotCount / 2f) pos -= slotCount.toFloat()
+                        if (pos < -slotCount / 2f) pos += slotCount.toFloat()
+                        val absPos = abs(pos)
+
+                        val fadeEdge = minOf(3.8f, slotCount / 2f - 0.5f)
+                        val normalizedDist = absPos / maxOf(fadeEdge, 1f)
+
+                        // Scale
+                        val scale = maxOf(0.55f, 1f - 0.38f * normalizedDist.pow(0.85f))
+                        // Y offset (cards sink away from center)
+                        val yOffset = normalizedDist.pow(1.6f) * fadeEdge * 5f
+                        // X offset (horizontal spread)
+                        val xOffset = pos * 62f * (1f + absPos * 0.05f)
+                        // Y-axis rotation (perspective tilt)
+                        val yRotation = (-pos * 13f).coerceIn(-55f, 55f)
+                        // X-axis tumble
+                        val xRotation = (sin(pos.toDouble() * PI) * 10f).toFloat()
+                        // Z lean
+                        val zRotation = (pos * 1f).coerceIn(-5f, 5f)
+                        // Opacity
+                        val opacity = if (absPos >= fadeEdge) 0f
+                        else maxOf(0f, 1f - absPos / fadeEdge).pow(1.5f)
+                        // Shadow
+                        val shadowRadius = maxOf(0f, 12f * (1f - normalizedDist))
+
+                        if (opacity > 0.01f) {
+                            CarouselCard(
+                                recipe = recipe,
+                                modifier = Modifier
+                                    .width(210.dp)
+                                    .height(290.dp)
+                                    .zIndex(100f - absPos)
+                                    .graphicsLayer {
+                                        this.scaleX = scale
+                                        this.scaleY = scale
+                                        this.translationX = xOffset * density
+                                        this.translationY = yOffset * density
+                                        this.rotationY = yRotation
+                                        this.rotationX = xRotation
+                                        this.rotationZ = zRotation
+                                        this.alpha = opacity
+                                        this.shadowElevation = shadowRadius * density
+                                        this.cameraDistance = 8f * density
+                                    }
+                            )
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Recipe name
-                if (currentRecipe != null) {
-                    Text(
-                        currentRecipe.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 32.dp)
-                    )
-                    if (!currentRecipe.cookTime.isNullOrBlank()) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                // Recipe info below carousel
+                val currentIdx = recipeIndex(effectiveScroll)
+                if (filteredRecipes.isNotEmpty()) {
+                    val recipe = filteredRecipes[currentIdx]
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 40.dp, vertical = 8.dp)
+                    ) {
                         Text(
-                            currentRecipe.cookTime!!,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary
+                            recipe.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            if (!recipe.cookTime.isNullOrBlank()) {
+                                Text(
+                                    "\u23F1 ${recipe.cookTime}",
+                                    fontSize = 12.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                            Text(
+                                "${currentIdx + 1} / ${filteredRecipes.size}",
+                                fontSize = 12.sp,
+                                color = TextTertiary
+                            )
+                        }
                     }
                 }
             }
@@ -193,13 +335,11 @@ fun RouletteScreen(
                     .padding(bottom = 32.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                if (hasSpun && selectedIndex in filteredRecipes.indices) {
-                    // View Recipe button
+                if (hasResult && filteredRecipes.isNotEmpty()) {
                     Button(
                         onClick = {
-                            navController.navigate(
-                                Screen.RecipeDetail.createRoute(filteredRecipes[selectedIndex].id)
-                            )
+                            val idx = recipeIndex(scrollPosition.value)
+                            navController.navigate(Screen.RecipeDetail.createRoute(filteredRecipes[idx].id))
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -212,12 +352,10 @@ fun RouletteScreen(
                         Text(S.viewRecipe, fontWeight = FontWeight.Bold, color = Color.White)
                     }
 
-                    // Spin Again button
                     OutlinedButton(
                         onClick = {
-                            if (filteredRecipes.isNotEmpty()) {
-                                selectedIndex = filteredRecipes.indices.random()
-                            }
+                            hasResult = false
+                            shuffle()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -230,20 +368,14 @@ fun RouletteScreen(
                         Text(S.spinAgain, fontWeight = FontWeight.Bold)
                     }
                 } else {
-                    // Tap to Spin button
                     Button(
-                        onClick = {
-                            if (filteredRecipes.isNotEmpty()) {
-                                selectedIndex = filteredRecipes.indices.random()
-                                hasSpun = true
-                            }
-                        },
+                        onClick = { shuffle() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Primary),
                         shape = RoundedCornerShape(14.dp),
-                        enabled = filteredRecipes.isNotEmpty()
+                        enabled = filteredRecipes.isNotEmpty() && !isShuffling
                     ) {
                         Icon(Icons.Default.Casino, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
@@ -256,71 +388,68 @@ fun RouletteScreen(
 }
 
 @Composable
-private fun RouletteCard(recipe: Recipe?, modifier: Modifier = Modifier) {
+private fun CarouselCard(recipe: Recipe, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        shadowElevation = 8.dp,
-        color = MaterialTheme.colorScheme.surface
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 4.dp
     ) {
-        if (recipe != null && !recipe.imageUrl.isNullOrBlank()) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                AsyncImage(
-                    model = recipe.imageUrl,
-                    contentDescription = recipe.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                // Bottom gradient overlay
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(80.dp)
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))
-                            )
-                        )
-                )
-            }
-        } else {
-            // Placeholder
+        Column {
+            // Image area
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(
-                                Primary.copy(alpha = 0.2f),
-                                Primary.copy(alpha = 0.4f)
-                            )
-                        )
-                    ),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .height(190.dp)
+                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             ) {
-                if (recipe != null) {
-                    Icon(
-                        Icons.Outlined.Restaurant,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = Primary.copy(alpha = 0.5f)
+                if (!recipe.imageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = recipe.imageUrl,
+                        contentDescription = recipe.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(
-                            Icons.Default.Casino,
+                            Icons.Outlined.Restaurant,
                             contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = Primary.copy(alpha = 0.5f)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            LocalStrings.current.spinToPick,
-                            color = TextSecondary,
-                            style = MaterialTheme.typography.bodyMedium
+                            modifier = Modifier.size(28.dp),
+                            tint = Primary.copy(alpha = 0.3f)
                         )
                     }
+                }
+            }
+
+            // Title + calories
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    recipe.title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 18.sp
+                )
+                if (!recipe.calories.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        recipe.calories!!,
+                        fontSize = 11.sp,
+                        color = TextSecondary
+                    )
                 }
             }
         }
