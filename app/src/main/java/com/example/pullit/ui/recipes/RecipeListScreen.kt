@@ -2,6 +2,7 @@ package com.example.pullit.ui.recipes
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -72,6 +73,7 @@ fun RecipeListScreen(
     authManager: AuthManager,
     onRecipeTap: (String) -> Unit,
     onRouletteClick: () -> Unit,
+    onCookbookTap: (String) -> Unit = {},
     onImportClick: () -> Unit
 ) {
     val S = LocalStrings.current
@@ -363,7 +365,7 @@ fun RecipeListScreen(
                         CookbookListContent(
                             cookbooks = cookbooks,
                             viewModel = viewModel,
-                            onRecipeTap = onRecipeTap
+                            onCookbookTap = onCookbookTap
                         )
                     }
                 }
@@ -842,13 +844,13 @@ private fun GeneratingRecipeCard(
 }
 
 // ──────────────────────────────────────────────────────────
-// Cookbook list content (placeholder for Cookbooks tab)
+// Cookbook list content (matches iOS RecipeListView cookbooks)
 // ──────────────────────────────────────────────────────────
 @Composable
 private fun CookbookListContent(
     cookbooks: List<com.example.pullit.data.model.Cookbook>,
     viewModel: RecipeListViewModel,
-    onRecipeTap: (String) -> Unit
+    onCookbookTap: (String) -> Unit
 ) {
     val S = LocalStrings.current
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -860,7 +862,12 @@ private fun CookbookListContent(
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("\uD83D\uDCDA", fontSize = 60.sp)
+                Icon(
+                    Icons.Outlined.MenuBook,
+                    contentDescription = null,
+                    modifier = Modifier.size(56.dp),
+                    tint = TextTertiary
+                )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     S.noCookbooks,
@@ -877,77 +884,179 @@ private fun CookbookListContent(
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { showCreateDialog = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        S.createCookbook,
-                        color = Color.White
-                    )
+                    Text(S.createCookbook, color = Color.White)
                 }
             }
         }
     } else {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(bottom = 80.dp)
-        ) {
-            // "Create new" card
-            item(key = "create_cookbook") {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .clickable { showCreateDialog = true },
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                Icons.Default.Add,
-                                contentDescription = null,
-                                tint = Primary,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                S.newCookbook,
-                                fontSize = 13.sp,
-                                color = TextSecondary
-                            )
-                        }
-                    }
-                }
-            }
+        Column {
+            cookbooks.forEach { cookbook ->
+                val recipes = viewModel.recipesForCookbook(cookbook)
+                val favoriteCount = recipes.count { it.favorited }
 
-            items(cookbooks, key = { it.id }) { cookbook ->
-                Surface(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp)
-                        .clickable { viewModel.setSelectedCookbook(cookbook.id) },
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    shadowElevation = 4.dp
+                        .clickable { onCookbookTap(cookbook.id) }
+                        .padding(vertical = 12.dp)
                 ) {
-                    Box(
-                        modifier = Modifier.padding(12.dp),
-                        contentAlignment = Alignment.BottomStart
+                    // Title row with counts
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             cookbook.title,
-                            fontSize = 15.sp,
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Outlined.MenuBook,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = TextTertiary
+                                )
+                                Text(
+                                    "${recipes.size}",
+                                    fontSize = 12.sp,
+                                    color = TextTertiary
+                                )
+                            }
+                            if (favoriteCount > 0) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.FavoriteBorder,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = TextTertiary
+                                    )
+                                    Text(
+                                        "$favoriteCount",
+                                        fontSize = 12.sp,
+                                        color = TextTertiary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Recipe preview thumbnails - always 5 columns
+                    if (recipes.isNotEmpty()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            val previewCount = 5
+                            for (index in 0 until previewCount) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                ) {
+                                    if (index < recipes.size) {
+                                        val recipe = recipes[index]
+                                        if (!recipe.imageUrl.isNullOrBlank()) {
+                                            AsyncImage(
+                                                model = recipe.imageUrl,
+                                                contentDescription = recipe.title,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    Icons.Outlined.Restaurant,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(16.dp),
+                                                    tint = TextTertiary
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        // Empty placeholder with dashed border
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color.Transparent),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Surface(
+                                                modifier = Modifier.fillMaxSize(),
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = Color.Transparent,
+                                                border = androidx.compose.foundation.BorderStroke(
+                                                    1.dp,
+                                                    TextTertiary.copy(alpha = 0.3f)
+                                                )
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        Icons.Default.Add,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(12.dp),
+                                                        tint = TextTertiary.copy(alpha = 0.4f)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
+
+                // Divider
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    thickness = 0.5.dp
+                )
+            }
+
+            // Add cookbook button
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showCreateDialog = true }
+                    .padding(vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = Primary
+                )
+                Text(
+                    S.createCookbook,
+                    fontSize = 15.sp,
+                    color = Primary
+                )
             }
         }
     }

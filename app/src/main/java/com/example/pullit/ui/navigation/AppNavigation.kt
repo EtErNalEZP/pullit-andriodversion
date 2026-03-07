@@ -56,6 +56,9 @@ sealed class Screen(val route: String) {
         fun createRoute(index: Int) = "suggestion_detail/$index"
     }
     data object More : Screen("more")
+    data object CookbookDetail : Screen("cookbook_detail/{cookbookId}") {
+        fun createRoute(cookbookId: String) = "cookbook_detail/$cookbookId"
+    }
     data object PrivacyInfo : Screen("privacy_info")
 }
 
@@ -169,6 +172,9 @@ fun AppNavigation(authManager: AuthManager) {
                     onRouletteClick = {
                         navController.navigate(Screen.Roulette.route)
                     },
+                    onCookbookTap = { cookbookId ->
+                        navController.navigate(Screen.CookbookDetail.createRoute(cookbookId))
+                    },
                     onImportClick = { /* handled by internal bottom sheet */ }
                 )
             }
@@ -203,6 +209,13 @@ fun AppNavigation(authManager: AuthManager) {
             }
             composable(Screen.More.route) {
                 MoreScreen(authManager = authManager, navController = navController)
+            }
+            composable(Screen.CookbookDetail.route) { backStackEntry ->
+                val cookbookId = backStackEntry.arguments?.getString("cookbookId") ?: return@composable
+                com.example.pullit.ui.recipes.CookbookDetailScreen(
+                    cookbookId = cookbookId,
+                    navController = navController
+                )
             }
             composable(Screen.PrivacyInfo.route) {
                 com.example.pullit.ui.more.PrivacyInfoScreen(navController = navController)

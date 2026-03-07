@@ -2,6 +2,7 @@ package com.example.pullit.ui.mealplan
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -42,71 +43,19 @@ fun MealPlanScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableIntStateOf(0) }
 
-    // Add recipe dialog — show all recipes, checkmark for ones already in plan
+    // Add recipe bottom sheet — matches cookbook recipe picker style
     if (showAddDialog) {
-        val existingRecipeIds = mealPlanItems.map { it.recipeId }.toSet()
-
-        AlertDialog(
+        ModalBottomSheet(
             onDismissRequest = { showAddDialog = false },
-            title = { Text(S.mealPlan, fontWeight = FontWeight.Bold) },
-            text = {
-                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
-                    items(recipes) { recipe ->
-                        val isInPlan = recipe.id in existingRecipeIds
-                        Surface(
-                            onClick = {
-                                if (isInPlan) {
-                                    val item = mealPlanItems.find { it.recipeId == recipe.id }
-                                    if (item != null) viewModel.removeFromMealPlan(item)
-                                } else {
-                                    viewModel.addToMealPlan(recipe.id)
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (!recipe.imageUrl.isNullOrBlank()) {
-                                    AsyncImage(
-                                        model = recipe.imageUrl,
-                                        contentDescription = recipe.title,
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(40.dp)
-                                            .clip(RoundedCornerShape(6.dp))
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                }
-                                Text(
-                                    recipe.title,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                if (isInPlan) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Icon(
-                                        Icons.Filled.CheckCircle,
-                                        contentDescription = S.inPlan,
-                                        tint = Primary,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showAddDialog = false }) {
-                    Text(S.done, color = Primary)
-                }
-            }
-        )
+            containerColor = MaterialTheme.colorScheme.background
+        ) {
+            MealPlanRecipePicker(
+                recipes = recipes,
+                mealPlanItems = mealPlanItems,
+                viewModel = viewModel,
+                onDismiss = { showAddDialog = false }
+            )
+        }
     }
 
     Scaffold(
@@ -413,6 +362,166 @@ private fun WeeklyPlanTab(
                         Text(S.clearAll, color = Error)
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MealPlanRecipePicker(
+    recipes: List<Recipe>,
+    mealPlanItems: List<MealPlanItem>,
+    viewModel: MealPlanViewModel,
+    onDismiss: () -> Unit
+) {
+    val S = LocalStrings.current
+    var searchText by remember { mutableStateOf("") }
+    val existingRecipeIds = mealPlanItems.map { it.recipeId }.toSet()
+
+    val filteredRecipes = remember(recipes, searchText) {
+        if (searchText.isBlank()) recipes
+        else recipes.filter { it.title.contains(searchText, ignoreCase = true) }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 32.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                S.addRecipes,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            TextButton(onClick = onDismiss) {
+                Text(S.done, color = Primary)
+            }
+        }
+
+        // Search
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(horizontal = 12.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                Icons.Default.Search,
+                contentDescription = null,
+                tint = TextTertiary,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            TextField(
+                value = searchText,
+                onValueChange = { searchText = it },
+                placeholder = { Text(S.searchRecipes, fontSize = 14.sp, color = TextTertiary) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                    cursorColor = Primary
+                ),
+                textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Recipe list
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 400.dp)
+        ) {
+            items(filteredRecipes, key = { it.id }) { recipe ->
+                val isInPlan = recipe.id in existingRecipeIds
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (isInPlan) {
+                                val item = mealPlanItems.find { it.recipeId == recipe.id }
+                                if (item != null) viewModel.removeFromMealPlan(item)
+                            } else {
+                                viewModel.addToMealPlan(recipe.id)
+                            }
+                        }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Thumbnail
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                    ) {
+                        if (!recipe.imageUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = recipe.imageUrl,
+                                contentDescription = recipe.title,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Restaurant,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = TextTertiary
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Text(
+                        recipe.title,
+                        fontSize = 15.sp,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Icon(
+                        imageVector = if (isInPlan) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                        contentDescription = null,
+                        tint = if (isInPlan) Primary else TextTertiary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 72.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                    thickness = 0.5.dp
+                )
             }
         }
     }

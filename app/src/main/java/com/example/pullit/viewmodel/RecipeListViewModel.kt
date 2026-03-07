@@ -115,4 +115,20 @@ class RecipeListViewModel(application: Application) : AndroidViewModel(applicati
             cookbookDao.upsert(cookbook.copy(recipeIdsJson = json.encodeToString<List<String>>(ids)))
         }
     }
+
+    fun removeRecipeFromCookbook(recipeId: String, cookbookId: String) = viewModelScope.launch {
+        val cookbook = cookbookDao.getById(cookbookId) ?: return@launch
+        val ids = cookbook.recipeIdsJson?.let {
+            runCatching { json.decodeFromString<List<String>>(it) }.getOrDefault(emptyList())
+        }?.toMutableList() ?: mutableListOf()
+        ids.remove(recipeId)
+        cookbookDao.upsert(cookbook.copy(recipeIdsJson = json.encodeToString<List<String>>(ids)))
+    }
+
+    fun recipesForCookbook(cookbook: Cookbook): List<Recipe> {
+        val recipeIds = cookbook.recipeIdsJson?.let {
+            runCatching { json.decodeFromString<List<String>>(it) }.getOrDefault(emptyList())
+        } ?: emptyList()
+        return recipes.value.filter { it.id in recipeIds }
+    }
 }
