@@ -2,7 +2,7 @@ package com.example.pullit.ui.recipes
 
 import android.content.Intent
 import android.graphics.Bitmap
-import android.view.View
+import android.graphics.BitmapFactory
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -30,7 +30,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -47,8 +46,12 @@ import com.example.pullit.data.model.Ingredient
 import com.example.pullit.data.model.Nutrition
 import com.example.pullit.data.model.Step
 import com.example.pullit.ui.navigation.Screen
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.RecipeDetailViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,6 +65,7 @@ fun RecipeDetailScreen(
     val isInMealPlan by viewModel.isInMealPlan.collectAsState()
     val json = remember { Json { ignoreUnknownKeys = true } }
     val context = LocalContext.current
+    val S = LocalStrings.current
 
     LaunchedEffect(recipeId) { viewModel.loadRecipe(recipeId) }
 
@@ -83,6 +87,7 @@ fun RecipeDetailScreen(
         }
     }
 
+    val scope = rememberCoroutineScope()
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
     var showCookbookDialog by remember { mutableStateOf(false) }
@@ -124,19 +129,19 @@ fun RecipeDetailScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete recipe?") },
-            text = { Text("This cannot be undone.") },
+            title = { Text(S.deleteRecipe) },
+            text = { Text(S.cannotUndo) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.deleteRecipe()
                     navController.popBackStack()
                 }) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(S.delete, color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
+                    Text(S.cancel)
                 }
             }
         )
@@ -148,14 +153,14 @@ fun RecipeDetailScreen(
         var newName by remember { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { showCookbookDialog = false; creatingNew = false; newName = "" },
-            title = { Text("\u52A0\u5165\u98DF\u8C31\u96C6") },
+            title = { Text(S.addToCookbook) },
             text = {
                 Column {
                     if (creatingNew) {
                         OutlinedTextField(
                             value = newName,
                             onValueChange = { newName = it },
-                            placeholder = { Text("\u98DF\u8C31\u96C6\u540D\u79F0") },
+                            placeholder = { Text(S.cookbookName) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -176,7 +181,7 @@ fun RecipeDetailScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                "+ \u65B0\u5EFA\u98DF\u8C31\u96C6",
+                                "+ ${S.newCookbook}",
                                 modifier = Modifier.fillMaxWidth(),
                                 color = Primary
                             )
@@ -191,14 +196,14 @@ fun RecipeDetailScreen(
                             viewModel.createCookbook(newName.trim())
                             newName = ""; creatingNew = false
                         }
-                    }) { Text("\u521B\u5EFA") }
+                    }) { Text(S.create) }
                 } else {
-                    TextButton(onClick = { showCookbookDialog = false }) { Text("\u53D6\u6D88") }
+                    TextButton(onClick = { showCookbookDialog = false }) { Text(S.cancel) }
                 }
             },
             dismissButton = {
                 if (creatingNew) {
-                    TextButton(onClick = { creatingNew = false; newName = "" }) { Text("\u8FD4\u56DE") }
+                    TextButton(onClick = { creatingNew = false; newName = "" }) { Text(S.back) }
                 }
             }
         )
@@ -212,7 +217,7 @@ fun RecipeDetailScreen(
         ) {
             Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
                 Text(
-                    "\u5206\u4EAB\u98DF\u8C31",  // 分享食谱
+                    S.shareRecipe,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -239,11 +244,11 @@ fun RecipeDetailScreen(
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
-                                "\u4EE5\u6587\u5B57\u5206\u4EAB",  // 以文字分享
+                                S.shareAsText,
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                "\u590D\u5236\u98DF\u8C31\u6587\u5B57\u5185\u5BB9",  // 复制食谱文字内容
+                                S.shareAsTextHint,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = TextSecondary
                             )
@@ -255,7 +260,7 @@ fun RecipeDetailScreen(
                 Surface(
                     onClick = {
                         showShareSheet = false
-                        shareAsImage(context, r, ingredients, steps)
+                        scope.launch { shareAsImage(context, r, ingredients, steps) }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -273,11 +278,11 @@ fun RecipeDetailScreen(
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
-                                "\u4EE5\u56FE\u7247\u5206\u4EAB",  // 以图片分享
+                                S.shareAsImage,
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                "\u751F\u6210\u98DF\u8C31\u5361\u7247\u56FE\u7247",  // 生成食谱卡片图片
+                                S.shareAsImageHint,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = TextSecondary
                             )
@@ -297,7 +302,7 @@ fun RecipeDetailScreen(
                 windowInsets = WindowInsets.statusBars,
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, S.back)
                     }
                 },
                 actions = {
@@ -333,7 +338,7 @@ fun RecipeDetailScreen(
                         ) {
                             if (r.sourceUrl != null) {
                                 DropdownMenuItem(
-                                    text = { Text("Open Source URL") },
+                                    text = { Text(S.openSourceUrl) },
                                     onClick = {
                                         showMoreMenu = false
                                         val intent = Intent(Intent.ACTION_VIEW,
@@ -346,7 +351,7 @@ fun RecipeDetailScreen(
                                 )
                             }
                             DropdownMenuItem(
-                                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                                text = { Text(S.delete, color = MaterialTheme.colorScheme.error) },
                                 onClick = {
                                     showMoreMenu = false
                                     showDeleteDialog = true
@@ -539,7 +544,7 @@ fun RecipeDetailScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "Servings",
+                        S.servings,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.weight(1f)
@@ -617,7 +622,7 @@ fun RecipeDetailScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            "Add to Cookbook",
+                            S.addToCookbookBtn,
                             color = Primary,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
@@ -654,7 +659,7 @@ fun RecipeDetailScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            if (addedToMealPlan) "Added" else "Add to Meal Plan",
+                            if (addedToMealPlan) S.added else S.addToMealPlan,
                             color = mealPlanTextColor,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
@@ -674,7 +679,7 @@ fun RecipeDetailScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "Ingredients",
+                            S.ingredients,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
@@ -783,7 +788,7 @@ fun RecipeDetailScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "Steps",
+                            S.steps,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
@@ -815,7 +820,7 @@ fun RecipeDetailScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                "Start Cooking",
+                                S.startCooking,
                                 color = Primary,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -1078,38 +1083,26 @@ private fun shareAsText(
     context.startActivity(Intent.createChooser(intent, null))
 }
 
-private fun shareAsImage(
+private suspend fun shareAsImage(
     context: android.content.Context,
     recipe: com.example.pullit.data.model.Recipe,
     ingredients: List<Ingredient>,
     steps: List<Step>
 ) {
-    // Render a recipe card to bitmap using ComposeView
-    val composeView = ComposeView(context).apply {
-        setContent {
-            com.example.pullit.ui.theme.PullitTheme {
-                RecipeShareCard(recipe = recipe, ingredients = ingredients, steps = steps)
-            }
+    val bitmap = withContext(Dispatchers.IO) {
+        // Download cover image if available
+        val coverBitmap = recipe.imageUrl?.let { url ->
+            runCatching {
+                java.net.URL(url).openStream().use { BitmapFactory.decodeStream(it) }
+            }.getOrNull()
         }
+        renderRecipeCardBitmap(context, recipe, ingredients, steps, coverBitmap)
     }
 
-    // Measure and layout at 390dp width
-    val density = context.resources.displayMetrics.density
-    val widthPx = (390 * density).toInt()
-    val widthSpec = View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY)
-    val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-    composeView.measure(widthSpec, heightSpec)
-    composeView.layout(0, 0, composeView.measuredWidth, composeView.measuredHeight)
-
-    val bitmap = Bitmap.createBitmap(
-        composeView.measuredWidth, composeView.measuredHeight, Bitmap.Config.ARGB_8888
-    )
-    val canvas = android.graphics.Canvas(bitmap)
-    composeView.draw(canvas)
-
-    // Save to cache and share
     val file = java.io.File(context.cacheDir, "share_recipe.png")
-    file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    withContext(Dispatchers.IO) {
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
     val uri = androidx.core.content.FileProvider.getUriForFile(
         context, "${context.packageName}.fileprovider", file
     )
@@ -1121,106 +1114,181 @@ private fun shareAsImage(
     context.startActivity(Intent.createChooser(intent, null))
 }
 
-@Composable
-private fun RecipeShareCard(
+private fun renderRecipeCardBitmap(
+    context: android.content.Context,
     recipe: com.example.pullit.data.model.Recipe,
     ingredients: List<Ingredient>,
-    steps: List<Step>
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // Title
-        Text(
-            recipe.title,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
+    steps: List<Step>,
+    coverBitmap: Bitmap?
+): Bitmap {
+    val dp = context.resources.displayMetrics.density
+    val width = (390 * dp).toInt()
+    val pad = 24 * dp
+    val cw = (width - pad * 2).toInt()
 
-        // Description
-        recipe.desc?.takeIf { it.isNotBlank() }?.let {
-            Text(it, fontSize = 14.sp, color = TextSecondary)
-        }
+    val textCol = 0xFF1A1A1A.toInt()
+    val secCol = 0xFF888888.toInt()
+    val priCol = 0xFFE8A87C.toInt()
+    val divCol = 0xFFE8E8E8.toInt()
+    val sectionCol = 0xFF666666.toInt()
 
-        // Meta row
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            recipe.cookTime?.takeIf { it.isNotBlank() }?.let {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Outlined.Schedule, null, modifier = Modifier.size(14.dp), tint = TextSecondary)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(it, fontSize = 12.sp, color = TextSecondary)
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Person, null, modifier = Modifier.size(14.dp), tint = TextSecondary)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("${recipe.servings} \u4EFD", fontSize = 12.sp, color = TextSecondary)  // 份
-            }
-        }
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-        // Ingredients
-        Text(
-            "\u98DF\u6750",  // 食材
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        ingredients.forEach { ing ->
-            Row(modifier = Modifier.fillMaxWidth()) {
-                Text("\u2022 ", fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground)
-                Text(ing.name, fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground)
-                Spacer(modifier = Modifier.weight(1f))
-                Text(ing.amount, fontSize = 13.sp, color = TextSecondary)
-            }
-        }
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-        // Steps
-        Text(
-            "\u6B65\u9AA4",  // 步骤
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        steps.forEach { step ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    "${step.order}.",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Primary,
-                    modifier = Modifier.width(20.dp)
-                )
-                Text(
-                    step.instruction,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-
-        // Footer
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-                "Pullit Recipes",
-                fontSize = 11.sp,
-                color = TextTertiary
-            )
-        }
+    fun paint(color: Int, size: Float, bold: Boolean = false) = android.text.TextPaint(
+        android.graphics.Paint.ANTI_ALIAS_FLAG
+    ).apply {
+        this.color = color; textSize = size * dp
+        if (bold) typeface = android.graphics.Typeface.DEFAULT_BOLD
     }
+
+    val titleP = paint(textCol, 22f, true)
+    val descP = paint(secCol, 14f)
+    val metaP = paint(secCol, 12f)
+    val headP = paint(textCol, 16f, true)
+    val sectionP = paint(sectionCol, 13f, true)
+    val bodyP = paint(textCol, 13f)
+    val amtP = paint(secCol, 13f)
+    val numP = paint(priCol, 13f, true)
+    val sourceP = paint(secCol, 11f)
+    val footP = paint(0xFFAAAAAA.toInt(), 11f)
+    val lineP = android.graphics.Paint().apply { color = divCol; strokeWidth = dp }
+    val imgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+
+    fun layout(text: String, p: android.text.TextPaint, w: Int = cw) =
+        android.text.StaticLayout.Builder.obtain(text, 0, text.length, p, w).build()
+
+    val gap = 10 * dp
+    val smallGap = 4 * dp
+
+    // --- Measure total height ---
+    var h = 0f
+
+    // Cover image: full width, 4:3 aspect ratio
+    val coverHeight = if (coverBitmap != null) (width * 3f / 4f) else 0f
+    h += coverHeight
+
+    h += pad  // top padding after cover (or top of card if no cover)
+
+    val titleL = layout(recipe.title, titleP); h += titleL.height + gap
+    val descL = recipe.desc?.takeIf { it.isNotBlank() }?.let { layout(it, descP) }
+    descL?.let { h += it.height + gap }
+    val metaParts = mutableListOf<String>()
+    recipe.cookTime?.takeIf { it.isNotBlank() }?.let { metaParts.add("\u23F1 $it") }
+    recipe.calories?.takeIf { it.isNotBlank() }?.let { metaParts.add("\uD83D\uDD25 $it") }
+    metaParts.add("\uD83D\uDC64 ${recipe.servings}\u4EFD")
+    val metaL = layout(metaParts.joinToString("   "), metaP); h += metaL.height + gap * 1.5f
+    h += dp + gap  // divider
+
+    // Ingredients with sections
+    val ingHead = layout("\u98DF\u6750", headP); h += ingHead.height + gap
+
+    // Group ingredients by section
+    data class IngRow(val l: android.text.StaticLayout, val amount: String)
+    data class IngGroup(val section: String?, val rows: List<IngRow>)
+
+    val ingGroups = mutableListOf<IngGroup>()
+    var curSection: String? = null
+    var curRows = mutableListOf<IngRow>()
+    for (ing in ingredients) {
+        if (ing.section != curSection && (ing.section != null || curSection != null)) {
+            if (curRows.isNotEmpty()) ingGroups.add(IngGroup(curSection, curRows.toList()))
+            curSection = ing.section
+            curRows = mutableListOf()
+        }
+        curRows.add(IngRow(layout("\u2022 ${ing.name}", bodyP, (cw * 0.65f).toInt()), ing.amount))
+    }
+    if (curRows.isNotEmpty()) ingGroups.add(IngGroup(curSection, curRows.toList()))
+
+    for (group in ingGroups) {
+        group.section?.let {
+            val sl = layout(it, sectionP); h += sl.height + smallGap
+        }
+        group.rows.forEach { h += it.l.height + smallGap }
+        h += smallGap
+    }
+    h += gap; h += dp + gap  // divider
+
+    // Steps
+    val stepHead = layout("\u6B65\u9AA4", headP); h += stepHead.height + gap
+    val numW = (24 * dp).toInt()
+    data class StepRow(val order: Int, val l: android.text.StaticLayout)
+    val stepRows = steps.map { StepRow(it.order, layout(it.instruction, bodyP, cw - numW)) }
+    stepRows.forEach { h += it.l.height + gap * 0.8f }
+    h += gap; h += dp + gap  // divider
+
+    // Source URL
+    val sourceL = recipe.sourceUrl?.takeIf { it.isNotBlank() && !it.startsWith("local:") }?.let {
+        layout("\u6765\u6E90: $it", sourceP)
+    }
+    sourceL?.let { h += it.height + gap }
+
+    // Footer
+    val footL = layout("Pullit Recipes", footP); h += footL.height + pad
+
+    // --- Draw ---
+    val bmp = Bitmap.createBitmap(width, h.toInt(), Bitmap.Config.ARGB_8888)
+    val c = android.graphics.Canvas(bmp)
+    c.drawColor(android.graphics.Color.WHITE)
+    var y = 0f
+
+    fun drawLayout(l: android.text.StaticLayout, x: Float = pad) {
+        c.save(); c.translate(x, y); l.draw(c); c.restore()
+    }
+    fun divider() { c.drawLine(pad, y, width - pad, y, lineP); y += dp + gap }
+
+    // Cover image - center crop to fill width x coverHeight
+    if (coverBitmap != null && coverHeight > 0) {
+        val srcW = coverBitmap.width.toFloat()
+        val srcH = coverBitmap.height.toFloat()
+        val dstW = width.toFloat()
+        val dstH = coverHeight
+        val scale = maxOf(dstW / srcW, dstH / srcH)
+        val scaledW = srcW * scale
+        val scaledH = srcH * scale
+        val srcRect = android.graphics.Rect(
+            ((scaledW - dstW) / 2 / scale).toInt(),
+            ((scaledH - dstH) / 2 / scale).toInt(),
+            (srcW - (scaledW - dstW) / 2 / scale).toInt(),
+            (srcH - (scaledH - dstH) / 2 / scale).toInt()
+        )
+        val dstRect = android.graphics.Rect(0, 0, width, coverHeight.toInt())
+        c.drawBitmap(coverBitmap, srcRect, dstRect, imgPaint)
+        y = coverHeight
+    }
+
+    y += pad
+
+    drawLayout(titleL); y += titleL.height + gap
+    descL?.let { drawLayout(it); y += it.height + gap }
+    drawLayout(metaL); y += metaL.height + gap * 1.5f
+    divider()
+
+    drawLayout(ingHead); y += ingHead.height + gap
+    for (group in ingGroups) {
+        group.section?.let {
+            val sl = layout(it, sectionP)
+            drawLayout(sl); y += sl.height + smallGap
+        }
+        for (row in group.rows) {
+            drawLayout(row.l)
+            val aw = amtP.measureText(row.amount)
+            c.drawText(row.amount, width - pad - aw, y + row.l.height * 0.75f, amtP)
+            y += row.l.height + smallGap
+        }
+        y += smallGap
+    }
+    y += gap; divider()
+
+    drawLayout(stepHead); y += stepHead.height + gap
+    for (row in stepRows) {
+        c.drawText("${row.order}.", pad, y + bodyP.textSize, numP)
+        drawLayout(row.l, pad + numW)
+        y += row.l.height + gap * 0.8f
+    }
+    y += gap; divider()
+
+    sourceL?.let { drawLayout(it); y += it.height + gap }
+
+    val fw = footP.measureText("Pullit Recipes")
+    c.drawText("Pullit Recipes", width - pad - fw, y + footP.textSize, footP)
+
+    return bmp
 }

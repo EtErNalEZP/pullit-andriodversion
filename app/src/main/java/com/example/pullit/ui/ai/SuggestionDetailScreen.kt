@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.AiRecommendViewModel
 
@@ -32,6 +33,7 @@ fun SuggestionDetailScreen(
     navController: NavController,
     viewModel: AiRecommendViewModel = viewModel()
 ) {
+    val S = LocalStrings.current
     val suggestions by viewModel.suggestions.collectAsState()
     val suggestion = suggestions.getOrNull(index)
 
@@ -45,7 +47,7 @@ fun SuggestionDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Recipe Detail") },
+                title = { Text(S.recipeDetail) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -94,7 +96,7 @@ fun SuggestionDetailScreen(
                                         append(cal)
                                     }
                                     withStyle(SpanStyle(color = TextSecondary)) {
-                                        append(" kcal")
+                                        append(" ${S.kcal}")
                                     }
                                 },
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
@@ -128,7 +130,7 @@ fun SuggestionDetailScreen(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        if (saved) "Saved to Recipes" else "Save to Recipes",
+                        if (saved) S.savedToRecipes else S.saveToRecipes,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -138,7 +140,7 @@ fun SuggestionDetailScreen(
             // Ingredients section
             item {
                 Text(
-                    "Ingredients",
+                    S.ingredients,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -170,7 +172,7 @@ fun SuggestionDetailScreen(
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "Steps",
+                    S.steps,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )

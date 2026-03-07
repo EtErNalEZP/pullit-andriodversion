@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.painterResource
 import coil3.compose.AsyncImage
 import com.example.pullit.R
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.ImportMethod
 import com.example.pullit.viewmodel.ImportViewModel
@@ -42,6 +43,7 @@ fun ImportSheet(
     onDismiss: () -> Unit,
     onStartGenerating: () -> Unit
 ) {
+    val S = LocalStrings.current
     val inputText by importViewModel.inputText.collectAsState()
     val importMethod by importViewModel.importMethod.collectAsState()
     val isGenerating by importViewModel.isGenerating.collectAsState()
@@ -87,7 +89,7 @@ fun ImportSheet(
 
         // Title
         Text(
-            "Import Recipe",
+            S.importRecipe,
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
@@ -97,7 +99,7 @@ fun ImportSheet(
 
         // Supported Platforms caption
         Text(
-            "Supported Platforms",
+            S.supportedPlatforms,
             style = MaterialTheme.typography.labelMedium,
             color = TextTertiary
         )
@@ -112,10 +114,10 @@ fun ImportSheet(
             data class PlatformIcon(val iconRes: Int, val label: String)
 
             val platforms = listOf(
-                PlatformIcon(R.drawable.ic_platform_xiaohongshu, "\u5C0F\u7EA2\u4E66"),
-                PlatformIcon(R.drawable.ic_platform_douyin, "TikTok"),
+                PlatformIcon(R.drawable.ic_platform_xiaohongshu, S.xiaohongshu),
+                PlatformIcon(R.drawable.ic_platform_douyin, S.douyin),
                 PlatformIcon(R.drawable.ic_platform_bilibili, "Bilibili"),
-                PlatformIcon(R.drawable.ic_platform_xiachufang, "\u4E0B\u53A8\u623F"),
+                PlatformIcon(R.drawable.ic_platform_xiachufang, S.xiachufang),
                 PlatformIcon(R.drawable.ic_platform_instagram, "Instagram"),
                 PlatformIcon(R.drawable.ic_platform_youtube, "YouTube")
             )
@@ -156,7 +158,7 @@ fun ImportSheet(
         // Custom segmented control (Link / Text / Image)
         SegmentedTabControl(
             selectedIndex = importMethod.ordinal,
-            tabs = listOf("Link", "Text", "Image"),
+            tabs = listOf(S.link, S.text, S.image),
             onTabSelected = { index ->
                 importViewModel.setImportMethod(ImportMethod.entries[index])
             }
@@ -312,6 +314,7 @@ private fun LinkTab(
     onSwitchToImage: () -> Unit,
     onSwitchToText: () -> Unit
 ) {
+    val S = LocalStrings.current
     // Text field with link icon and paste/clear button
     Box(
         modifier = Modifier
@@ -343,7 +346,7 @@ private fun LinkTab(
                 onValueChange = onInputChange,
                 placeholder = {
                     Text(
-                        "Paste link or share text here...",
+                        S.pasteLink,
                         color = TextTertiary,
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -379,7 +382,7 @@ private fun LinkTab(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Paste", style = MaterialTheme.typography.labelMedium)
+                    Text(S.paste, style = MaterialTheme.typography.labelMedium)
                 }
             } else {
                 IconButton(
@@ -443,10 +446,10 @@ private fun LinkTab(
                 strokeWidth = 2.dp
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Processing...", color = Color.White)
+            Text(S.processing, color = Color.White)
         } else {
             Text(
-                "Import Recipe",
+                S.importRecipe,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
@@ -455,7 +458,7 @@ private fun LinkTab(
 
     // Labeled divider "Or Import From"
     Spacer(modifier = Modifier.height(24.dp))
-    LabeledDivider(label = "Or Import From")
+    LabeledDivider(label = S.orImportFrom)
     Spacer(modifier = Modifier.height(16.dp))
 
     // Two equal buttons side by side
@@ -481,7 +484,7 @@ private fun LinkTab(
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                "Photo",
+                S.photo,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -505,7 +508,7 @@ private fun LinkTab(
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                "Text",
+                S.text,
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -520,6 +523,7 @@ private fun TextTab(
     onInputChange: (String) -> Unit,
     onImport: () -> Unit
 ) {
+    val S = LocalStrings.current
     // Large text area
     Box(
         modifier = Modifier
@@ -538,7 +542,7 @@ private fun TextTab(
             onValueChange = onInputChange,
             placeholder = {
                 Text(
-                    "Paste recipe text here...",
+                    S.pasteRecipeText,
                     color = TextTertiary,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -581,10 +585,10 @@ private fun TextTab(
                 strokeWidth = 2.dp
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Processing...", color = Color.White)
+            Text(S.processing, color = Color.White)
         } else {
             Text(
-                "Import Recipe",
+                S.importRecipe,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )
@@ -599,6 +603,7 @@ private fun ImageTab(
     onPickImage: () -> Unit,
     onImport: () -> Unit
 ) {
+    val S = LocalStrings.current
     // Photo picker button
     OutlinedButton(
         onClick = onPickImage,
@@ -618,7 +623,7 @@ private fun ImageTab(
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            if (selectedImageUri != null) "Change Image" else "Choose Image",
+            if (selectedImageUri != null) S.changeImage else S.chooseImage,
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -629,7 +634,7 @@ private fun ImageTab(
         Spacer(modifier = Modifier.height(12.dp))
         AsyncImage(
             model = selectedImageUri,
-            contentDescription = "Selected image",
+            contentDescription = S.selectedImage,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxWidth()
@@ -661,10 +666,10 @@ private fun ImageTab(
                 strokeWidth = 2.dp
             )
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Processing...", color = Color.White)
+            Text(S.processing, color = Color.White)
         } else {
             Text(
-                "Import Recipe",
+                S.importRecipe,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
             )

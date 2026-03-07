@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.example.pullit.auth.AuthManager
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.components.MiniToasterView
 import com.example.pullit.data.model.Recipe
 import com.example.pullit.ui.theme.*
@@ -37,12 +38,17 @@ import java.util.Calendar
 // ──────────────────────────────────────────────────────────
 // Greeting helper
 // ──────────────────────────────────────────────────────────
-private fun greetingText(displayName: String?): String {
+private fun greetingText(
+    displayName: String?,
+    goodMorning: String,
+    goodAfternoon: String,
+    goodEvening: String
+): String {
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val timeGreeting = when {
-        hour < 12 -> "\u65E9\u4E0A\u597D \u2600\uFE0F"   // 早上好 ☀️
-        hour < 18 -> "\u4E0B\u5348\u597D \uD83D\uDC4B"     // 下午好 👋
-        else -> "\u665A\u4E0A\u597D \uD83C\uDF19"           // 晚上好 🌙
+        hour < 12 -> "$goodMorning \u2600\uFE0F"   // ☀️
+        hour < 18 -> "$goodAfternoon \uD83D\uDC4B"   // 👋
+        else -> "$goodEvening \uD83C\uDF19"           // 🌙
     }
     return if (!displayName.isNullOrBlank()) "$timeGreeting, $displayName" else timeGreeting
 }
@@ -50,9 +56,9 @@ private fun greetingText(displayName: String?): String {
 // ──────────────────────────────────────────────────────────
 // Tab enum
 // ──────────────────────────────────────────────────────────
-private enum class RecipeTab(val label: String) {
-    ALL_RECIPES("\u6240\u6709\u98DF\u8C31"),   // 所有食谱
-    COOKBOOKS("\u98DF\u8C31\u96C6")              // 食谱集
+private enum class RecipeTab {
+    ALL_RECIPES,
+    COOKBOOKS
 }
 
 // ──────────────────────────────────────────────────────────
@@ -68,6 +74,8 @@ fun RecipeListScreen(
     onRouletteClick: () -> Unit,
     onImportClick: () -> Unit
 ) {
+    val S = LocalStrings.current
+
     val recipes by viewModel.filteredRecipes.collectAsState()
     val cookbooks by viewModel.cookbooks.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -105,6 +113,7 @@ fun RecipeListScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             floatingActionButton = {
                 if (!isMultiSelectMode) {
                     FloatingActionButton(
@@ -125,13 +134,14 @@ fun RecipeListScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+                    .windowInsetsPadding(WindowInsets.statusBars)
                     .padding(horizontal = 16.dp)
             ) {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // ── Greeting ──
                 Text(
-                    text = greetingText(displayName),
+                    text = greetingText(displayName, S.goodMorning, S.goodAfternoon, S.goodEvening),
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -166,7 +176,10 @@ fun RecipeListScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = tab.label,
+                                    text = when (tab) {
+                                        RecipeTab.ALL_RECIPES -> S.allRecipes
+                                        RecipeTab.COOKBOOKS -> S.cookbooks
+                                    },
                                     fontSize = 13.sp,
                                     fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
                                     color = if (isActive) Color.White
@@ -220,7 +233,7 @@ fun RecipeListScreen(
                             onDismissRequest = { showSortMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("\u6700\u65B0\u4F18\u5148") },  // 最新优先
+                                text = { Text(S.newestFirst) },
                                 onClick = { viewModel.setSortOrder(SortOrder.NEWEST); showSortMenu = false },
                                 leadingIcon = {
                                     if (sortOrder == SortOrder.NEWEST) Icon(
@@ -232,7 +245,7 @@ fun RecipeListScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("\u6700\u65E7\u4F18\u5148") },  // 最旧优先
+                                text = { Text(S.oldestFirst) },
                                 onClick = { viewModel.setSortOrder(SortOrder.OLDEST); showSortMenu = false },
                                 leadingIcon = {
                                     if (sortOrder == SortOrder.OLDEST) Icon(
@@ -244,7 +257,7 @@ fun RecipeListScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("\u6309\u540D\u79F0") },  // 按名称
+                                text = { Text(S.byName) },
                                 onClick = { viewModel.setSortOrder(SortOrder.NAME); showSortMenu = false },
                                 leadingIcon = {
                                     if (sortOrder == SortOrder.NAME) Icon(
@@ -295,7 +308,7 @@ fun RecipeListScreen(
                         onValueChange = { viewModel.setSearchQuery(it) },
                         placeholder = {
                             Text(
-                                "\u641C\u7D22\u98DF\u8C31...",  // 搜索食谱...
+                                S.searchRecipes,
                                 color = TextTertiary,
                                 fontSize = 14.sp
                             )
@@ -389,7 +402,7 @@ fun RecipeListScreen(
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "\u5DF2\u9009\u62E9",  // 已选择
+                            S.selected,
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -407,7 +420,7 @@ fun RecipeListScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("\u52A0\u5165\u98DF\u8C31\u96C6", fontSize = 13.sp)  // 加入食谱集
+                            Text(S.addToCookbook, fontSize = 13.sp)
                         }
 
                         // Delete button
@@ -425,7 +438,7 @@ fun RecipeListScreen(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("\u5220\u9664", fontSize = 13.sp)  // 删除
+                            Text(S.delete, fontSize = 13.sp)
                         }
                     }
                 }
@@ -444,14 +457,14 @@ fun RecipeListScreen(
                 showNewCookbookInDialog = false
                 newCookbookNameInDialog = ""
             },
-            title = { Text("\u52A0\u5165\u98DF\u8C31\u96C6") },  // 加入食谱集
+            title = { Text(S.addToCookbook) },
             text = {
                 Column {
                     if (showNewCookbookInDialog) {
                         OutlinedTextField(
                             value = newCookbookNameInDialog,
                             onValueChange = { newCookbookNameInDialog = it },
-                            placeholder = { Text("\u98DF\u8C31\u96C6\u540D\u79F0") },  // 食谱集名称
+                            placeholder = { Text(S.cookbookName) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -475,7 +488,7 @@ fun RecipeListScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                "+ \u65B0\u5EFA\u98DF\u8C31\u96C6",  // + 新建食谱集
+                                "+ ${S.newCookbook}",
                                 modifier = Modifier.fillMaxWidth(),
                                 color = Primary
                             )
@@ -494,11 +507,11 @@ fun RecipeListScreen(
                             }
                         }
                     ) {
-                        Text("\u521B\u5EFA")  // 创建
+                        Text(S.create)
                     }
                 } else {
                     TextButton(onClick = { showCookbookDialog = false }) {
-                        Text("\u53D6\u6D88")  // 取消
+                        Text(S.cancel)
                     }
                 }
             },
@@ -508,7 +521,7 @@ fun RecipeListScreen(
                         showNewCookbookInDialog = false
                         newCookbookNameInDialog = ""
                     }) {
-                        Text("\u8FD4\u56DE")  // 返回
+                        Text(S.back)
                     }
                 }
             }
@@ -535,6 +548,8 @@ private fun RecipeGridContent(
     onFavoriteTap: (Recipe) -> Unit,
     onGeneratedRecipeTap: (Recipe) -> Unit
 ) {
+    val S = LocalStrings.current
+
     // Determine if we should show the generating card
     val showGeneratingCard = isGenerating || generatedRecipe != null
 
@@ -553,18 +568,18 @@ private fun RecipeGridContent(
                 val (emoji, title, subtitle) = when {
                     showFavoritesOnly -> Triple(
                         "\u2764\uFE0F",
-                        "\u8FD8\u6CA1\u6709\u6536\u85CF\u7684\u98DF\u8C31",       // 还没有收藏的食谱
-                        "\u70B9\u51FB\u7231\u5FC3\u6536\u85CF\u4F60\u559C\u6B22\u7684\u98DF\u8C31"  // 点击爱心收藏你喜欢的食谱
+                        S.noSavedRecipes,
+                        S.noSavedRecipesHint
                     )
                     searchQuery.isNotBlank() -> Triple(
                         "\uD83D\uDD0D",
-                        "\u6CA1\u6709\u627E\u5230\u76F8\u5173\u98DF\u8C31",       // 没有找到相关食谱
-                        "\u8BD5\u8BD5\u5176\u4ED6\u5173\u952E\u8BCD"                // 试试其他关键词
+                        S.noRecipesFound,
+                        S.noRecipesFoundHint
                     )
                     else -> Triple(
                         "\uD83C\uDF73",
-                        "\u8FD8\u6CA1\u6709\u98DF\u8C31",                          // 还没有食谱
-                        "\u70B9\u51FB + \u5BFC\u5165\u4F60\u7684\u7B2C\u4E00\u4E2A\u98DF\u8C31"  // 点击 + 导入你的第一个食谱
+                        S.noRecipes,
+                        S.noRecipesHint
                     )
                 }
                 Text(emoji, fontSize = 60.sp)
@@ -633,6 +648,7 @@ private fun GeneratingRecipeCard(
     pendingCoverUrl: String?,
     onTap: () -> Unit
 ) {
+    val S = LocalStrings.current
     val cardShape = RoundedCornerShape(16.dp)
     val isCompleted = generatedRecipe != null && !isGenerating
 
@@ -640,7 +656,7 @@ private fun GeneratingRecipeCard(
     val displayTitle = when {
         isCompleted -> generatedRecipe!!.title
         !pendingTitle.isNullOrBlank() -> pendingTitle
-        else -> "\u6B63\u5728\u751F\u6210\u98DF\u8C31..."  // 正在生成食谱...
+        else -> S.generatingRecipe
     }
 
     // Display cover URL: completed recipe image > pending cover
@@ -805,14 +821,14 @@ private fun GeneratingRecipeCard(
                 Spacer(modifier = Modifier.height(4.dp))
                 if (isCompleted) {
                     Text(
-                        "\u70B9\u51FB\u67E5\u770B\u98DF\u8C31",  // 点击查看食谱
+                        S.tapToViewRecipe,
                         fontSize = 11.sp,
                         color = Success,
                         fontWeight = FontWeight.Medium
                     )
                 } else {
                     Text(
-                        progress?.message ?: "\u6B63\u5728\u5904\u7406...",  // 正在处理...
+                        progress?.message ?: S.processing,
                         fontSize = 11.sp,
                         color = TextTertiary,
                         fontWeight = FontWeight.Medium,
@@ -834,6 +850,7 @@ private fun CookbookListContent(
     viewModel: RecipeListViewModel,
     onRecipeTap: (String) -> Unit
 ) {
+    val S = LocalStrings.current
     var showCreateDialog by remember { mutableStateOf(false) }
     var newCookbookTitle by remember { mutableStateOf("") }
 
@@ -846,14 +863,14 @@ private fun CookbookListContent(
                 Text("\uD83D\uDCDA", fontSize = 60.sp)
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "\u8FD8\u6CA1\u6709\u98DF\u8C31\u96C6",  // 还没有食谱集
+                    S.noCookbooks,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    "\u521B\u5EFA\u98DF\u8C31\u96C6\u6765\u6574\u7406\u4F60\u7684\u98DF\u8C31",  // 创建食谱集来整理你的食谱
+                    S.noCookbooksHint,
                     fontSize = 14.sp,
                     color = TextSecondary
                 )
@@ -865,7 +882,7 @@ private fun CookbookListContent(
                     Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        "\u521B\u5EFA\u98DF\u8C31\u96C6",  // 创建食谱集
+                        S.createCookbook,
                         color = Color.White
                     )
                 }
@@ -898,7 +915,7 @@ private fun CookbookListContent(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                "\u65B0\u5EFA\u98DF\u8C31\u96C6",  // 新建食谱集
+                                S.newCookbook,
                                 fontSize = 13.sp,
                                 color = TextSecondary
                             )
@@ -939,12 +956,12 @@ private fun CookbookListContent(
     if (showCreateDialog) {
         AlertDialog(
             onDismissRequest = { showCreateDialog = false; newCookbookTitle = "" },
-            title = { Text("\u65B0\u5EFA\u98DF\u8C31\u96C6") },  // 新建食谱集
+            title = { Text(S.newCookbook) },
             text = {
                 OutlinedTextField(
                     value = newCookbookTitle,
                     onValueChange = { newCookbookTitle = it },
-                    placeholder = { Text("\u98DF\u8C31\u96C6\u540D\u79F0") },  // 食谱集名称
+                    placeholder = { Text(S.cookbookName) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -959,12 +976,12 @@ private fun CookbookListContent(
                         }
                     }
                 ) {
-                    Text("\u521B\u5EFA", color = Primary)  // 创建
+                    Text(S.create, color = Primary)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showCreateDialog = false; newCookbookTitle = "" }) {
-                    Text("\u53D6\u6D88")  // 取消
+                    Text(S.cancel)
                 }
             }
         )

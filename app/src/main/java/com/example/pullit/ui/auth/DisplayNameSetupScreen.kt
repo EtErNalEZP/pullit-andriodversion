@@ -13,6 +13,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pullit.auth.AuthManager
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.Primary
 import com.example.pullit.ui.theme.PrimaryLight
 import com.example.pullit.ui.theme.TextSecondary
@@ -20,6 +21,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun DisplayNameSetupScreen(authManager: AuthManager, onComplete: () -> Unit) {
+    val S = LocalStrings.current
     var name by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -42,7 +44,7 @@ fun DisplayNameSetupScreen(authManager: AuthManager, onComplete: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(20.dp))
         Text(
-            "What should we call you?",
+            S.whatShouldWeCallYou,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
@@ -50,7 +52,7 @@ fun DisplayNameSetupScreen(authManager: AuthManager, onComplete: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "Pick a display name for your profile.\nYou can change it later.",
+            S.pickDisplayName,
             color = TextSecondary,
             fontSize = 15.sp,
             textAlign = TextAlign.Center,
@@ -61,7 +63,7 @@ fun DisplayNameSetupScreen(authManager: AuthManager, onComplete: () -> Unit) {
         OutlinedTextField(
             value = name,
             onValueChange = { if (it.length <= 20) name = it },
-            label = { Text("Display name") },
+            label = { Text(S.displayNamePlaceholder) },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
@@ -78,7 +80,7 @@ fun DisplayNameSetupScreen(authManager: AuthManager, onComplete: () -> Unit) {
         ) {
             Text(
                 text = when {
-                    name.isNotEmpty() && trimmedLength < 2 -> "At least 2 characters"
+                    name.isNotEmpty() && trimmedLength < 2 -> S.atLeast2Chars
                     else -> ""
                 },
                 fontSize = 12.sp,
@@ -119,7 +121,7 @@ fun DisplayNameSetupScreen(authManager: AuthManager, onComplete: () -> Unit) {
                 color = MaterialTheme.colorScheme.onPrimary,
                 strokeWidth = 2.dp
             )
-            else Text("Continue", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            else Text(S.continueBtn, fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
 
         errorMessage?.let {

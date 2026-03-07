@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.pullit.data.local.AppDatabase
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.CookingModeViewModel
 import kotlinx.coroutines.launch
@@ -38,6 +39,7 @@ fun CookingModeScreen(
     navController: NavController,
     viewModel: CookingModeViewModel = viewModel()
 ) {
+    val S = LocalStrings.current
     val context = LocalContext.current
     val steps by viewModel.steps.collectAsState()
     val ingredients by viewModel.ingredients.collectAsState()
@@ -83,13 +85,13 @@ fun CookingModeScreen(
             onDismissRequest = { showTimerDialog = false },
             containerColor = CookingCard,
             titleContentColor = CookingText,
-            title = { Text("Set Timer", fontWeight = FontWeight.Bold) },
+            title = { Text(S.setTimer, fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = timerMinutesInput,
                         onValueChange = { timerMinutesInput = it.filter { c -> c.isDigit() }.take(3) },
-                        label = { Text("Minutes", color = TextSecondary) },
+                        label = { Text(S.minutes, color = TextSecondary) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = CookingText,
@@ -101,7 +103,7 @@ fun CookingModeScreen(
                     OutlinedTextField(
                         value = timerSecondsInput,
                         onValueChange = { timerSecondsInput = it.filter { c -> c.isDigit() }.take(2) },
-                        label = { Text("Seconds", color = TextSecondary) },
+                        label = { Text(S.seconds, color = TextSecondary) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = CookingText,
@@ -119,11 +121,11 @@ fun CookingModeScreen(
                     val totalSecs = mins * 60 + secs
                     if (totalSecs > 0) viewModel.startTimer(totalSecs)
                     showTimerDialog = false
-                }) { Text("Start", color = Primary, fontWeight = FontWeight.Bold) }
+                }) { Text(S.start, color = Primary, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
                 TextButton(onClick = { showTimerDialog = false }) {
-                    Text("Cancel", color = TextSecondary)
+                    Text(S.cancel, color = TextSecondary)
                 }
             }
         )
@@ -276,7 +278,7 @@ fun CookingModeScreen(
                             ) {
                                 Icon(
                                     if (isTimerRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isTimerRunning) "Pause" else "Play",
+                                    contentDescription = if (isTimerRunning) S.pause else S.play,
                                     tint = Primary
                                 )
                             }
@@ -293,7 +295,7 @@ fun CookingModeScreen(
                             ) {
                                 Icon(
                                     Icons.Default.Stop,
-                                    contentDescription = "Reset",
+                                    contentDescription = S.reset,
                                     tint = CookingText
                                 )
                             }

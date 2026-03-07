@@ -29,6 +29,7 @@ import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import com.example.pullit.data.model.Recipe
 import com.example.pullit.ui.navigation.Screen
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.RecipeListViewModel
 
@@ -38,6 +39,7 @@ fun RouletteScreen(
     navController: NavController,
     viewModel: RecipeListViewModel = viewModel()
 ) {
+    val S = LocalStrings.current
     val recipes by viewModel.recipes.collectAsState()
     val cookbooks by viewModel.cookbooks.collectAsState()
     var selectedCookbookId by remember { mutableStateOf<String?>(null) }
@@ -62,7 +64,7 @@ fun RouletteScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Recipe Roulette", fontWeight = FontWeight.Bold) },
+                title = { Text(S.recipeRoulette, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -89,7 +91,7 @@ fun RouletteScreen(
                     FilterChip(
                         selected = selectedCookbookId == null,
                         onClick = { selectedCookbookId = null; selectedIndex = -1; hasSpun = false },
-                        label = { Text("All Recipes") },
+                        label = { Text(S.allRecipes) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = Primary,
                             selectedLabelColor = Color.White,
@@ -131,12 +133,12 @@ fun RouletteScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "No recipes to spin",
+                        S.noRecipesToSpin,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        "Add some recipes first!",
+                        S.addSomeRecipes,
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextTertiary
                     )
@@ -207,7 +209,7 @@ fun RouletteScreen(
                     ) {
                         Icon(Icons.Default.Visibility, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("View Recipe", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(S.viewRecipe, fontWeight = FontWeight.Bold, color = Color.White)
                     }
 
                     // Spin Again button
@@ -225,7 +227,7 @@ fun RouletteScreen(
                     ) {
                         Icon(Icons.Default.Casino, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Spin Again", fontWeight = FontWeight.Bold)
+                        Text(S.spinAgain, fontWeight = FontWeight.Bold)
                     }
                 } else {
                     // Tap to Spin button
@@ -245,7 +247,7 @@ fun RouletteScreen(
                     ) {
                         Icon(Icons.Default.Casino, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Tap to Spin", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(S.tapToSpin, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 }
             }
@@ -314,7 +316,7 @@ private fun RouletteCard(recipe: Recipe?, modifier: Modifier = Modifier) {
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Spin to pick!",
+                            LocalStrings.current.spinToPick,
                             color = TextSecondary,
                             style = MaterialTheme.typography.bodyMedium
                         )

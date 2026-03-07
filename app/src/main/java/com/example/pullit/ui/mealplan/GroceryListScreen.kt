@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.pullit.data.model.GroceryItem
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.MealPlanViewModel
 
@@ -35,6 +36,7 @@ fun GroceryListScreen(
     navController: NavController,
     viewModel: MealPlanViewModel = viewModel()
 ) {
+    val S = LocalStrings.current
     val groceryItems by viewModel.groceryItems.collectAsState()
     var newItemName by remember { mutableStateOf("") }
 
@@ -44,7 +46,7 @@ fun GroceryListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Grocery List", fontWeight = FontWeight.Bold) },
+                title = { Text(S.groceryList, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
@@ -71,7 +73,7 @@ fun GroceryListScreen(
                     OutlinedTextField(
                         value = newItemName,
                         onValueChange = { newItemName = it },
-                        placeholder = { Text("Add an item...", color = TextTertiary) },
+                        placeholder = { Text(S.addAnItem, color = TextTertiary) },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -93,7 +95,7 @@ fun GroceryListScreen(
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
                     ) {
-                        Text("Add", fontWeight = FontWeight.SemiBold, color = Color.White)
+                        Text(S.add, fontWeight = FontWeight.SemiBold, color = Color.White)
                     }
                 }
             }
@@ -115,12 +117,12 @@ fun GroceryListScreen(
                             )
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                "No items yet",
+                                S.noItemsYet,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = TextSecondary
                             )
                             Text(
-                                "Add items or generate from your meal plan",
+                                S.noItemsHint,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = TextTertiary
                             )
@@ -133,7 +135,7 @@ fun GroceryListScreen(
             if (toBuyItems.isNotEmpty()) {
                 item {
                     Text(
-                        "To Buy",
+                        S.toBuy,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(vertical = 8.dp)
@@ -152,7 +154,7 @@ fun GroceryListScreen(
             if (boughtItems.isNotEmpty()) {
                 item {
                     Text(
-                        "Bought",
+                        S.bought,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = TextSecondary,
@@ -184,7 +186,7 @@ fun GroceryListScreen(
                             ) {
                                 Icon(Icons.Outlined.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Clear Bought")
+                                Text(S.clearBought)
                             }
                         }
 
@@ -192,7 +194,7 @@ fun GroceryListScreen(
                             onClick = { viewModel.clearAllGroceries() },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Clear All", color = Error)
+                            Text(S.clearAll, color = Error)
                         }
                     }
                 }
@@ -264,7 +266,7 @@ private fun GroceryItemRow(
             }
             if (!item.fromRecipesJson.isNullOrBlank() && item.fromRecipesJson != "[]") {
                 Text(
-                    "From meal plan",
+                    LocalStrings.current.fromMealPlan,
                     style = MaterialTheme.typography.labelSmall,
                     color = TextTertiary,
                     modifier = Modifier.padding(top = 2.dp)

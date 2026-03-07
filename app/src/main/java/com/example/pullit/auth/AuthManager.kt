@@ -28,6 +28,9 @@ class AuthManager {
     private val _displayName = MutableStateFlow<String?>(null)
     val displayName: StateFlow<String?> = _displayName.asStateFlow()
 
+    private val _userEmail = MutableStateFlow<String?>(null)
+    val userEmail: StateFlow<String?> = _userEmail.asStateFlow()
+
     private val _needsDisplayName = MutableStateFlow(false)
     val needsDisplayName: StateFlow<Boolean> = _needsDisplayName.asStateFlow()
 
@@ -36,6 +39,7 @@ class AuthManager {
             val session = supabase.auth.currentSessionOrNull()
             if (session != null) {
                 _userId.value = session.user?.id
+                _userEmail.value = session.user?.email
                 _isAuthenticated.value = true
                 fetchProfile()
             }
@@ -54,6 +58,7 @@ class AuthManager {
         val session = supabase.auth.currentSessionOrNull()
         if (session != null) {
             _userId.value = session.user?.id
+            _userEmail.value = session.user?.email
             _isAuthenticated.value = true
             fetchProfile()
         }
@@ -66,6 +71,7 @@ class AuthManager {
         }
         val session = supabase.auth.currentSessionOrNull()
         _userId.value = session?.user?.id
+        _userEmail.value = session?.user?.email
         _isAuthenticated.value = true
         fetchProfile()
     }
@@ -87,6 +93,7 @@ class AuthManager {
     suspend fun signOut() {
         supabase.auth.signOut()
         _userId.value = null
+        _userEmail.value = null
         _displayName.value = null
         _isAuthenticated.value = false
         _needsDisplayName.value = false

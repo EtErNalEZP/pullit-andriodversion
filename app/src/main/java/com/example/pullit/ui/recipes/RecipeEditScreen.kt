@@ -27,6 +27,7 @@ import coil3.compose.AsyncImage
 import com.example.pullit.data.model.Ingredient
 import com.example.pullit.data.model.Nutrition
 import com.example.pullit.data.model.Step
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.RecipeDetailViewModel
 import kotlinx.serialization.builtins.ListSerializer
@@ -39,6 +40,7 @@ fun RecipeEditScreen(
     navController: NavController,
     viewModel: RecipeDetailViewModel = viewModel()
 ) {
+    val S = LocalStrings.current
     val recipe by viewModel.recipe.collectAsState()
     val json = remember { Json { ignoreUnknownKeys = true } }
 
@@ -83,14 +85,14 @@ fun RecipeEditScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Edit Recipe",
+                        S.editRecipe,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Cancel")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, S.cancel)
                     }
                 },
                 actions = {
@@ -128,7 +130,7 @@ fun RecipeEditScreen(
                         }
                     ) {
                         Text(
-                            "Save",
+                            S.save,
                             color = Primary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
@@ -151,7 +153,7 @@ fun RecipeEditScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Text(
-                        "Cover Image",
+                        S.coverImage,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = TextSecondary
@@ -227,7 +229,7 @@ fun RecipeEditScreen(
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
-                                    "Add Cover Photo",
+                                    S.addCoverPhoto,
                                     fontSize = 14.sp,
                                     color = TextTertiary
                                 )
@@ -243,12 +245,12 @@ fun RecipeEditScreen(
                     modifier = Modifier.padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    SectionHeader("Basic Info")
+                    SectionHeader(S.basicInfo)
 
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = { Text("Title") },
+                        label = { Text(S.title) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -258,7 +260,7 @@ fun RecipeEditScreen(
                     OutlinedTextField(
                         value = desc,
                         onValueChange = { desc = it },
-                        label = { Text("Description") },
+                        label = { Text(S.description) },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 3,
                         maxLines = 6,
@@ -273,7 +275,7 @@ fun RecipeEditScreen(
                         OutlinedTextField(
                             value = cookTime,
                             onValueChange = { cookTime = it },
-                            label = { Text("Cook Time") },
+                            label = { Text(S.cookTime) },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
                             shape = RoundedCornerShape(12.dp),
@@ -294,7 +296,7 @@ fun RecipeEditScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                "Servings",
+                                S.servings,
                                 fontSize = 12.sp,
                                 color = TextSecondary
                             )
@@ -356,14 +358,14 @@ fun RecipeEditScreen(
                             .fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        SectionHeader("Nutrition", modifier = Modifier.weight(1f))
+                        SectionHeader(S.nutrition, modifier = Modifier.weight(1f))
                         IconButton(
                             onClick = { nutritionExpanded = !nutritionExpanded }
                         ) {
                             Icon(
                                 if (nutritionExpanded) Icons.Default.ExpandLess
                                 else Icons.Default.ExpandMore,
-                                contentDescription = if (nutritionExpanded) "Collapse" else "Expand",
+                                contentDescription = if (nutritionExpanded) S.collapse else S.expand,
                                 tint = TextSecondary
                             )
                         }
@@ -375,7 +377,7 @@ fun RecipeEditScreen(
                                 OutlinedTextField(
                                     value = calories,
                                     onValueChange = { calories = it },
-                                    label = { Text("Calories") },
+                                    label = { Text(S.calories) },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true,
                                     shape = RoundedCornerShape(12.dp),
@@ -392,7 +394,7 @@ fun RecipeEditScreen(
                                 OutlinedTextField(
                                     value = protein,
                                     onValueChange = { protein = it },
-                                    label = { Text("Protein") },
+                                    label = { Text(S.protein) },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true,
                                     shape = RoundedCornerShape(12.dp),
@@ -411,7 +413,7 @@ fun RecipeEditScreen(
                                 OutlinedTextField(
                                     value = fat,
                                     onValueChange = { fat = it },
-                                    label = { Text("Fat") },
+                                    label = { Text(S.fat) },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true,
                                     shape = RoundedCornerShape(12.dp),
@@ -428,7 +430,7 @@ fun RecipeEditScreen(
                                 OutlinedTextField(
                                     value = carbs,
                                     onValueChange = { carbs = it },
-                                    label = { Text("Carbs") },
+                                    label = { Text(S.carbs) },
                                     modifier = Modifier.weight(1f),
                                     singleLine = true,
                                     shape = RoundedCornerShape(12.dp),
@@ -457,7 +459,7 @@ fun RecipeEditScreen(
                         .padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SectionHeader("Ingredients", modifier = Modifier.weight(1f))
+                    SectionHeader(S.ingredients, modifier = Modifier.weight(1f))
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = Primary.copy(alpha = 0.15f)
@@ -491,7 +493,7 @@ fun RecipeEditScreen(
                                     list[index] = ing.copy(name = newName)
                                 }
                             },
-                            label = { Text("Name") },
+                            label = { Text(S.name) },
                             modifier = Modifier.weight(1f),
                             singleLine = true,
                             shape = RoundedCornerShape(10.dp),
@@ -504,7 +506,7 @@ fun RecipeEditScreen(
                                     list[index] = ing.copy(amount = newAmount)
                                 }
                             },
-                            label = { Text("Amount") },
+                            label = { Text(S.amount) },
                             modifier = Modifier.weight(0.55f),
                             singleLine = true,
                             shape = RoundedCornerShape(10.dp),
@@ -538,7 +540,7 @@ fun RecipeEditScreen(
                             modifier = Modifier.height(28.dp)
                         ) {
                             Text(
-                                "+ Section",
+                                S.section,
                                 fontSize = 12.sp,
                                 color = TextTertiary
                             )
@@ -553,7 +555,7 @@ fun RecipeEditScreen(
                                     )
                                 }
                             },
-                            label = { Text("Section (optional)") },
+                            label = { Text(S.sectionOptional) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 4.dp),
@@ -587,7 +589,7 @@ fun RecipeEditScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        "Add Ingredient",
+                        S.addIngredient2,
                         color = Primary,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -603,7 +605,7 @@ fun RecipeEditScreen(
                         .padding(horizontal = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SectionHeader("Steps", modifier = Modifier.weight(1f))
+                    SectionHeader(S.steps, modifier = Modifier.weight(1f))
                     Surface(
                         shape = RoundedCornerShape(10.dp),
                         color = Primary.copy(alpha = 0.15f)
@@ -704,7 +706,7 @@ fun RecipeEditScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        "Add Step",
+                        S.addStep,
                         color = Primary,
                         fontWeight = FontWeight.SemiBold
                     )

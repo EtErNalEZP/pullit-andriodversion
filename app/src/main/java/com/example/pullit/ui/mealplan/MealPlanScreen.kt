@@ -26,6 +26,7 @@ import coil3.compose.AsyncImage
 import com.example.pullit.data.model.MealPlanItem
 import com.example.pullit.data.model.Recipe
 import com.example.pullit.ui.navigation.Screen
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.MealPlanViewModel
 
@@ -35,6 +36,7 @@ fun MealPlanScreen(
     navController: NavController,
     viewModel: MealPlanViewModel = viewModel()
 ) {
+    val S = LocalStrings.current
     val mealPlanItems by viewModel.mealPlanItems.collectAsState()
     val recipes by viewModel.recipes.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
@@ -46,7 +48,7 @@ fun MealPlanScreen(
 
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
-            title = { Text("Meal Plan", fontWeight = FontWeight.Bold) },
+            title = { Text(S.mealPlan, fontWeight = FontWeight.Bold) },
             text = {
                 LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
                     items(recipes) { recipe ->
@@ -89,7 +91,7 @@ fun MealPlanScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Icon(
                                         Icons.Filled.CheckCircle,
-                                        contentDescription = "In plan",
+                                        contentDescription = S.inPlan,
                                         tint = Primary,
                                         modifier = Modifier.size(22.dp)
                                     )
@@ -101,16 +103,17 @@ fun MealPlanScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showAddDialog = false }) {
-                    Text("Done", color = Primary)
+                    Text(S.done, color = Primary)
                 }
             }
         )
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text("Meal Plan", fontWeight = FontWeight.ExtraBold) }
+                title = { Text(S.mealPlan, fontWeight = FontWeight.ExtraBold) }
             )
         }
     ) { padding ->
@@ -128,7 +131,7 @@ fun MealPlanScreen(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(4.dp)
             ) {
-                val tabs = listOf("Weekly Plan", "Grocery List")
+                val tabs = listOf(S.weeklyPlan, S.groceryList)
                 tabs.forEachIndexed { index, title ->
                     val isSelected = selectedTab == index
                     val bgColor by animateColorAsState(
@@ -196,6 +199,7 @@ private fun WeeklyPlanTab(
     onRemoveItem: (MealPlanItem) -> Unit,
     onUpdateServings: (MealPlanItem, Int) -> Unit
 ) {
+    val S = LocalStrings.current
     if (mealPlanItems.isEmpty()) {
         // Empty state
         Box(
@@ -214,13 +218,13 @@ private fun WeeklyPlanTab(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "Start Planning",
+                    S.startPlanning,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "Add recipes to plan your meals for the week",
+                    S.startPlanningHint,
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary,
                     modifier = Modifier.padding(horizontal = 16.dp)
@@ -234,7 +238,7 @@ private fun WeeklyPlanTab(
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Add Recipes", fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(S.addRecipes, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         }
@@ -328,7 +332,7 @@ private fun WeeklyPlanTab(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Text(
-                                        "${item.servings} serving${if (item.servings > 1) "s" else ""}",
+                                        "${item.servings} ${if (item.servings > 1) S.servingsUnit else S.serving}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = TextSecondary
                                     )
@@ -386,7 +390,7 @@ private fun WeeklyPlanTab(
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Add Recipes", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(S.addRecipes, fontWeight = FontWeight.Bold, color = Color.White)
                     }
 
                     Button(
@@ -399,14 +403,14 @@ private fun WeeklyPlanTab(
                     ) {
                         Icon(Icons.Outlined.ShoppingCart, contentDescription = null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Generate Grocery List", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(S.generateGroceryList, fontWeight = FontWeight.Bold, color = Color.White)
                     }
 
                     TextButton(
                         onClick = onClearAll,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Clear All", color = Error)
+                        Text(S.clearAll, color = Error)
                     }
                 }
             }

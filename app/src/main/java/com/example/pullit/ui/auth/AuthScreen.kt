@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pullit.auth.AuthManager
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.Primary
 import com.example.pullit.ui.theme.PrimaryLight
 import com.example.pullit.ui.theme.TextSecondary
@@ -27,6 +28,7 @@ fun AuthScreen(
     onAuthSuccess: () -> Unit,
     onNeedsDisplayName: () -> Unit
 ) {
+    val S = LocalStrings.current
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isSignUp by remember { mutableStateOf(false) }
@@ -53,7 +55,7 @@ fun AuthScreen(
         // Logo
         Image(
             painter = painterResource(id = com.example.pullit.R.drawable.logo),
-            contentDescription = "Pullit Recipes",
+            contentDescription = S.pullitRecipes,
             modifier = Modifier
                 .size(100.dp)
                 .clip(RoundedCornerShape(24.dp))
@@ -61,14 +63,14 @@ fun AuthScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            "Pullit Recipes",
+            S.pullitRecipes,
             fontSize = 28.sp,
             fontWeight = FontWeight.ExtraBold,
             color = Primary
         )
         Spacer(modifier = Modifier.height(4.dp))
         Text(
-            "Your recipe companion",
+            S.yourRecipeCompanion,
             color = TextSecondary,
             fontSize = 15.sp
         )
@@ -77,8 +79,8 @@ fun AuthScreen(
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            label = { Text("Email") },
-            placeholder = { Text("you@example.com") },
+            label = { Text(S.email) },
+            placeholder = { Text(S.emailPlaceholder) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
@@ -92,7 +94,7 @@ fun AuthScreen(
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Password") },
+            label = { Text(S.password) },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             modifier = Modifier.fillMaxWidth(),
@@ -132,7 +134,7 @@ fun AuthScreen(
                 strokeWidth = 2.dp
             )
             else Text(
-                if (isSignUp) "Sign Up" else "Sign In",
+                if (isSignUp) S.signUp else S.signIn,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
             )
@@ -141,8 +143,8 @@ fun AuthScreen(
         Spacer(modifier = Modifier.height(12.dp))
         TextButton(onClick = { isSignUp = !isSignUp; errorMessage = null }) {
             Text(
-                if (isSignUp) "Already have an account? Sign In"
-                else "Don't have an account? Sign Up",
+                if (isSignUp) S.alreadyHaveAccount
+                else S.dontHaveAccount,
                 color = Primary,
                 fontSize = 14.sp
             )

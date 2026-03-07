@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.pullit.ui.navigation.Screen
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.AiRecommendViewModel
 import com.example.pullit.viewmodel.AiState
@@ -40,6 +41,7 @@ fun AiRecommendScreen(
     navController: NavController,
     viewModel: AiRecommendViewModel = viewModel()
 ) {
+    val S = LocalStrings.current
     val state by viewModel.state.collectAsState()
     val editableIngredients by viewModel.editableIngredients.collectAsState()
     val suggestions by viewModel.suggestions.collectAsState()
@@ -56,9 +58,10 @@ fun AiRecommendScreen(
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text("AI Recommend", fontWeight = FontWeight.ExtraBold) }
+                title = { Text(S.aiRecommend, fontWeight = FontWeight.ExtraBold) }
             )
         }
     ) { padding ->
@@ -94,7 +97,7 @@ fun AiRecommendScreen(
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Text(
-                            "AI Ingredient Recognition",
+                            S.aiIngredientRecognition,
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -102,7 +105,7 @@ fun AiRecommendScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            "Take a photo of your ingredients and we'll suggest recipes you can make",
+                            S.aiIngredientHint,
                             style = MaterialTheme.typography.bodyLarge,
                             color = TextSecondary,
                             modifier = Modifier.padding(horizontal = 16.dp)
@@ -120,7 +123,7 @@ fun AiRecommendScreen(
                         ) {
                             Icon(Icons.Outlined.PhotoLibrary, null, tint = Color.White)
                             Spacer(Modifier.width(8.dp))
-                            Text("Choose Photo", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
+                            Text(S.choosePhoto, fontWeight = FontWeight.Bold, color = Color.White, fontSize = 16.sp)
                         }
                     }
                 }
@@ -161,7 +164,7 @@ fun AiRecommendScreen(
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Text(
-                            "AI Analyzing...",
+                            S.aiAnalyzing,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -190,7 +193,7 @@ fun AiRecommendScreen(
                     // Editable ingredients section
                     item {
                         Text(
-                            "Found Ingredients",
+                            S.foundIngredients,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -227,7 +230,7 @@ fun AiRecommendScreen(
                             OutlinedTextField(
                                 value = newIngredient,
                                 onValueChange = { newIngredient = it },
-                                placeholder = { Text("Add ingredient...", color = TextTertiary) },
+                                placeholder = { Text(S.addIngredient, color = TextTertiary) },
                                 modifier = Modifier.weight(1f),
                                 singleLine = true,
                                 shape = RoundedCornerShape(12.dp),
@@ -243,7 +246,7 @@ fun AiRecommendScreen(
                                     newIngredient = ""
                                 }
                             }) {
-                                Icon(Icons.Default.Add, "Add", tint = Primary)
+                                Icon(Icons.Default.Add, S.add, tint = Primary)
                             }
                         }
                     }
@@ -272,7 +275,7 @@ fun AiRecommendScreen(
                                 } else {
                                     Icon(Icons.Outlined.AutoAwesome, null, tint = Color.White, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(6.dp))
-                                    Text("Get AI Suggestions", fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(S.getAiSuggestions, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
                             }
                             OutlinedButton(
@@ -282,7 +285,7 @@ fun AiRecommendScreen(
                             ) {
                                 Icon(Icons.Outlined.CameraAlt, null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("New Photo")
+                                Text(S.newPhoto)
                             }
                         }
                     }
@@ -292,7 +295,7 @@ fun AiRecommendScreen(
                         item {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                "Your Matching Recipes",
+                                S.yourMatchingRecipes,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -343,7 +346,7 @@ fun AiRecommendScreen(
                         item {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                "AI Suggestions",
+                                S.aiSuggestions,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -383,7 +386,7 @@ fun AiRecommendScreen(
                                     if (suggestion.steps.isNotEmpty()) {
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
-                                            "Step 1: ${suggestion.steps.first()}",
+                                            "${S.step} 1: ${suggestion.steps.first()}",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = TextTertiary,
                                             maxLines = 1,
@@ -425,7 +428,7 @@ fun AiRecommendScreen(
                                     )
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Text(
-                                        "Generating suggestions...",
+                                        S.generatingSuggestions,
                                         color = TextSecondary,
                                         fontWeight = FontWeight.Medium
                                     )
@@ -472,7 +475,7 @@ fun AiRecommendScreen(
                         Spacer(modifier = Modifier.height(20.dp))
 
                         Text(
-                            "Something went wrong",
+                            S.somethingWentWrong,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = Error
@@ -497,7 +500,7 @@ fun AiRecommendScreen(
                         ) {
                             Icon(Icons.Outlined.Refresh, null, tint = Color.White)
                             Spacer(Modifier.width(8.dp))
-                            Text("Try Again", fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(S.tryAgain, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                 }

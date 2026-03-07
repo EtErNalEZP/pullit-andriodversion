@@ -30,6 +30,7 @@ import com.example.pullit.ui.recipes.RecipeListScreen
 import com.example.pullit.ui.recipes.RouletteScreen
 import com.example.pullit.ui.ai.SuggestionDetailScreen
 import com.example.pullit.auth.AuthManager
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.viewmodel.ImportViewModel
 import com.example.pullit.viewmodel.RecipeListViewModel
 
@@ -55,6 +56,7 @@ sealed class Screen(val route: String) {
         fun createRoute(index: Int) = "suggestion_detail/$index"
     }
     data object More : Screen("more")
+    data object PrivacyInfo : Screen("privacy_info")
 }
 
 data class BottomNavItem(
@@ -64,17 +66,18 @@ data class BottomNavItem(
     val unselectedIcon: ImageVector
 )
 
-val bottomNavItems = listOf(
-    BottomNavItem(Screen.RecipeList, "Recipes", Icons.Filled.MenuBook, Icons.Outlined.MenuBook),
-    BottomNavItem(Screen.MealPlan, "Plan", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth),
-    BottomNavItem(Screen.AiRecommend, "AI", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome),
-    BottomNavItem(Screen.More, "More", Icons.Filled.MoreHoriz, Icons.Outlined.MoreHoriz)
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavigation(authManager: AuthManager) {
+    val S = LocalStrings.current
     val navController = rememberNavController()
+
+    val bottomNavItems = listOf(
+        BottomNavItem(Screen.RecipeList, S.recipes, Icons.Filled.MenuBook, Icons.Outlined.MenuBook),
+        BottomNavItem(Screen.MealPlan, S.mealPlan, Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth),
+        BottomNavItem(Screen.AiRecommend, "AI", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome),
+        BottomNavItem(Screen.More, S.more, Icons.Filled.MoreHoriz, Icons.Outlined.MoreHoriz)
+    )
     val isAuthenticated by authManager.isAuthenticated.collectAsState()
     val isLoading by authManager.isLoading.collectAsState()
     val needsDisplayName by authManager.needsDisplayName.collectAsState()
@@ -200,6 +203,9 @@ fun AppNavigation(authManager: AuthManager) {
             }
             composable(Screen.More.route) {
                 MoreScreen(authManager = authManager, navController = navController)
+            }
+            composable(Screen.PrivacyInfo.route) {
+                com.example.pullit.ui.more.PrivacyInfoScreen(navController = navController)
             }
         }
     }
