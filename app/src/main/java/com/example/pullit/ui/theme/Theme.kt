@@ -69,6 +69,9 @@ fun PullitTheme(
         AppAppearance.SYSTEM -> isSystemInDarkTheme()
     }
 
+    // Sync language to util.AppLanguage so API services use the correct language
+    com.example.pullit.util.AppLanguage.storedLanguage = language.key
+
     val strings = when (language) {
         AppLanguage.SYSTEM -> {
             val systemLang = Locale.getDefault().language
