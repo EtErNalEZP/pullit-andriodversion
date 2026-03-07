@@ -1,7 +1,13 @@
 package com.example.pullit.ui.recipes
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -9,123 +15,958 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavController
-import com.example.pullit.ui.navigation.Screen
-import com.example.pullit.ui.theme.Primary
+import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import com.example.pullit.auth.AuthManager
+import com.example.pullit.ui.components.MiniToasterView
+import com.example.pullit.data.model.Recipe
+import com.example.pullit.ui.theme.*
+import com.example.pullit.viewmodel.ImportViewModel
 import com.example.pullit.viewmodel.RecipeListViewModel
 import com.example.pullit.viewmodel.SortOrder
+import java.util.Calendar
 
+// ──────────────────────────────────────────────────────────
+// Greeting helper
+// ──────────────────────────────────────────────────────────
+private fun greetingText(displayName: String?): String {
+    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    val timeGreeting = when {
+        hour < 12 -> "\u65E9\u4E0A\u597D \u2600\uFE0F"   // 早上好 ☀️
+        hour < 18 -> "\u4E0B\u5348\u597D \uD83D\uDC4B"     // 下午好 👋
+        else -> "\u665A\u4E0A\u597D \uD83C\uDF19"           // 晚上好 🌙
+    }
+    return if (!displayName.isNullOrBlank()) "$timeGreeting, $displayName" else timeGreeting
+}
+
+// ──────────────────────────────────────────────────────────
+// Tab enum
+// ──────────────────────────────────────────────────────────
+private enum class RecipeTab(val label: String) {
+    ALL_RECIPES("\u6240\u6709\u98DF\u8C31"),   // 所有食谱
+    COOKBOOKS("\u98DF\u8C31\u96C6")              // 食谱集
+}
+
+// ──────────────────────────────────────────────────────────
+// Main screen
+// ──────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecipeListScreen(
-    navController: NavController,
-    viewModel: RecipeListViewModel = viewModel()
+    viewModel: RecipeListViewModel,
+    importViewModel: ImportViewModel,
+    authManager: AuthManager,
+    onRecipeTap: (String) -> Unit,
+    onRouletteClick: () -> Unit,
+    onImportClick: () -> Unit
 ) {
     val recipes by viewModel.filteredRecipes.collectAsState()
     val cookbooks by viewModel.cookbooks.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val sortOrder by viewModel.sortOrder.collectAsState()
     val showFavoritesOnly by viewModel.showFavoritesOnly.collectAsState()
-    val selectedCookbookId by viewModel.selectedCookbookId.collectAsState()
+    val isMultiSelectMode by viewModel.isMultiSelectMode.collectAsState()
+    val selectedRecipeIds by viewModel.selectedRecipeIds.collectAsState()
+    val displayName by authManager.displayName.collectAsState()
 
+    // Import state
+    val isGenerating by importViewModel.isGenerating.collectAsState()
+    val generatedRecipe by importViewModel.generatedRecipe.collectAsState()
+    val importProgress by importViewModel.progress.collectAsState()
+    val pendingTitle by importViewModel.pendingTitle.collectAsState()
+    val pendingCoverUrl by importViewModel.pendingCoverUrl.collectAsState()
+
+    var selectedTab by remember { mutableStateOf(RecipeTab.ALL_RECIPES) }
     var showSortMenu by remember { mutableStateOf(false) }
+    var showCookbookDialog by remember { mutableStateOf(false) }
+    var showImportSheet by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Recipes", fontWeight = FontWeight.ExtraBold) },
-                actions = {
-                    IconButton(onClick = { navController.navigate(Screen.Roulette.route) }) {
-                        Icon(Icons.Outlined.Casino, contentDescription = "Roulette")
-                    }
-                    IconButton(onClick = { viewModel.toggleFavoritesOnly() }) {
+    // Import bottom sheet
+    if (showImportSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showImportSheet = false },
+            containerColor = MaterialTheme.colorScheme.background
+        ) {
+            com.example.pullit.ui.import_recipe.ImportSheet(
+                importViewModel = importViewModel,
+                onDismiss = { showImportSheet = false },
+                onStartGenerating = { showImportSheet = false }
+            )
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            floatingActionButton = {
+                if (!isMultiSelectMode) {
+                    FloatingActionButton(
+                        onClick = { showImportSheet = true },
+                        containerColor = Primary,
+                        shape = CircleShape
+                    ) {
                         Icon(
-                            if (showFavoritesOnly) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                            contentDescription = "Favorites",
-                            tint = if (showFavoritesOnly) Primary else MaterialTheme.colorScheme.onSurface
+                            Icons.Default.Add,
+                            contentDescription = "Import recipe",
+                            tint = Color.White
                         )
                     }
-                    Box {
-                        IconButton(onClick = { showSortMenu = true }) {
-                            Icon(Icons.Outlined.Sort, contentDescription = "Sort")
-                        }
-                        DropdownMenu(expanded = showSortMenu, onDismissRequest = { showSortMenu = false }) {
-                            DropdownMenuItem(text = { Text("Newest first") }, onClick = { viewModel.setSortOrder(SortOrder.NEWEST); showSortMenu = false })
-                            DropdownMenuItem(text = { Text("Oldest first") }, onClick = { viewModel.setSortOrder(SortOrder.OLDEST); showSortMenu = false })
-                            DropdownMenuItem(text = { Text("By name") }, onClick = { viewModel.setSortOrder(SortOrder.NAME); showSortMenu = false })
-                        }
-                    }
                 }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { navController.navigate(Screen.Import.route) },
-                containerColor = Primary
+            }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Import recipe", tint = androidx.compose.ui.graphics.Color.White)
-            }
-        }
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding)) {
-            // Search bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { viewModel.setSearchQuery(it) },
-                placeholder = { Text("Search recipes...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                singleLine = true,
-                shape = MaterialTheme.shapes.large
-            )
+                Spacer(modifier = Modifier.height(12.dp))
 
-            // Cookbook filter chips
-            if (cookbooks.isNotEmpty()) {
-                ScrollableTabRow(
-                    selectedTabIndex = if (selectedCookbookId == null) 0 else cookbooks.indexOfFirst { it.id == selectedCookbookId } + 1,
+                // ── Greeting ──
+                Text(
+                    text = greetingText(displayName),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // ── Toolbar Row ──
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    edgePadding = 16.dp
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Tab(selected = selectedCookbookId == null, onClick = { viewModel.setSelectedCookbook(null) }) {
-                        Text("All", modifier = Modifier.padding(vertical = 12.dp))
-                    }
-                    cookbooks.forEach { cookbook ->
-                        Tab(selected = selectedCookbookId == cookbook.id, onClick = { viewModel.setSelectedCookbook(cookbook.id) }) {
-                            Text(cookbook.title, modifier = Modifier.padding(vertical = 12.dp))
+                    // Segmented buttons for tabs
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .weight(1f)
+                    ) {
+                        RecipeTab.entries.forEach { tab ->
+                            val isActive = selectedTab == tab
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(
+                                        if (isActive) Primary
+                                        else Color.Transparent
+                                    )
+                                    .clickable { selectedTab = tab }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = tab.label,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                    color = if (isActive) Color.White
+                                    else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                     }
-                }
-            }
 
-            if (recipes.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("\uD83C\uDF73", style = MaterialTheme.typography.displayLarge)
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("No recipes yet", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text("Tap + to import your first recipe", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Favorite filter heart icon button
+                    IconButton(
+                        onClick = { viewModel.toggleFavoritesOnly() },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (showFavoritesOnly) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = "Favorites",
+                            tint = if (showFavoritesOnly) Primary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Roulette button
+                    IconButton(
+                        onClick = onRouletteClick,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Shuffle,
+                            contentDescription = "Random recipe",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Sort menu
+                    Box {
+                        IconButton(
+                            onClick = { showSortMenu = true },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Sort,
+                                contentDescription = "Sort",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showSortMenu,
+                            onDismissRequest = { showSortMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("\u6700\u65B0\u4F18\u5148") },  // 最新优先
+                                onClick = { viewModel.setSortOrder(SortOrder.NEWEST); showSortMenu = false },
+                                leadingIcon = {
+                                    if (sortOrder == SortOrder.NEWEST) Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("\u6700\u65E7\u4F18\u5148") },  // 最旧优先
+                                onClick = { viewModel.setSortOrder(SortOrder.OLDEST); showSortMenu = false },
+                                leadingIcon = {
+                                    if (sortOrder == SortOrder.OLDEST) Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("\u6309\u540D\u79F0") },  // 按名称
+                                onClick = { viewModel.setSortOrder(SortOrder.NAME); showSortMenu = false },
+                                leadingIcon = {
+                                    if (sortOrder == SortOrder.NAME) Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            )
+                        }
+                    }
+
+                    // Multi-select mode toggle
+                    IconButton(
+                        onClick = { viewModel.toggleMultiSelectMode() },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isMultiSelectMode) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
+                            contentDescription = "Multi-select",
+                            tint = if (isMultiSelectMode) Primary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    contentPadding = PaddingValues(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // ── Search Bar ──
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(recipes, key = { it.id }) { recipe ->
-                        RecipeCard(
-                            recipe = recipe,
-                            onClick = { navController.navigate(Screen.RecipeDetail.createRoute(recipe.id)) },
-                            onFavoriteClick = { viewModel.toggleFavorite(recipe) }
+                    Icon(
+                        Icons.Default.Search,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.setSearchQuery(it) },
+                        placeholder = {
+                            Text(
+                                "\u641C\u7D22\u98DF\u8C31...",  // 搜索食谱...
+                                color = TextTertiary,
+                                fontSize = 14.sp
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                            cursorColor = Primary
+                        ),
+                        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // ── Content Area ──
+                when (selectedTab) {
+                    RecipeTab.ALL_RECIPES -> {
+                        RecipeGridContent(
+                            recipes = recipes,
+                            isGenerating = isGenerating,
+                            generatedRecipe = generatedRecipe,
+                            importProgress = importProgress,
+                            pendingTitle = pendingTitle,
+                            pendingCoverUrl = pendingCoverUrl,
+                            showFavoritesOnly = showFavoritesOnly,
+                            searchQuery = searchQuery,
+                            isMultiSelectMode = isMultiSelectMode,
+                            selectedRecipeIds = selectedRecipeIds,
+                            onRecipeTap = { recipeId ->
+                                if (isMultiSelectMode) {
+                                    viewModel.toggleRecipeSelection(recipeId)
+                                } else {
+                                    onRecipeTap(recipeId)
+                                }
+                            },
+                            onFavoriteTap = { recipe -> viewModel.toggleFavorite(recipe) },
+                            onGeneratedRecipeTap = { recipe ->
+                                onRecipeTap(recipe.id)
+                                importViewModel.reset()
+                            }
+                        )
+                    }
+
+                    RecipeTab.COOKBOOKS -> {
+                        CookbookListContent(
+                            cookbooks = cookbooks,
+                            viewModel = viewModel,
+                            onRecipeTap = onRecipeTap
                         )
                     }
                 }
             }
         }
+
+        // ── Selection Bar (when multi-select is active) ──
+        AnimatedVisibility(
+            visible = isMultiSelectMode,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shadowElevation = 8.dp,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Selection count badge
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Badge(
+                            containerColor = Primary,
+                            contentColor = Color.White
+                        ) {
+                            Text(
+                                text = "${selectedRecipeIds.size}",
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "\u5DF2\u9009\u62E9",  // 已选择
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Add to Cookbook button
+                        OutlinedButton(
+                            onClick = { showCookbookDialog = true },
+                            enabled = selectedRecipeIds.isNotEmpty()
+                        ) {
+                            Icon(
+                                Icons.Outlined.BookmarkAdd,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("\u52A0\u5165\u98DF\u8C31\u96C6", fontSize = 13.sp)  // 加入食谱集
+                        }
+
+                        // Delete button
+                        Button(
+                            onClick = { viewModel.deleteSelected() },
+                            enabled = selectedRecipeIds.isNotEmpty(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Error,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(
+                                Icons.Outlined.Delete,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("\u5220\u9664", fontSize = 13.sp)  // 删除
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Cookbook selection dialog ──
+    var showNewCookbookInDialog by remember { mutableStateOf(false) }
+    var newCookbookNameInDialog by remember { mutableStateOf("") }
+
+    if (showCookbookDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showCookbookDialog = false
+                showNewCookbookInDialog = false
+                newCookbookNameInDialog = ""
+            },
+            title = { Text("\u52A0\u5165\u98DF\u8C31\u96C6") },  // 加入食谱集
+            text = {
+                Column {
+                    if (showNewCookbookInDialog) {
+                        OutlinedTextField(
+                            value = newCookbookNameInDialog,
+                            onValueChange = { newCookbookNameInDialog = it },
+                            placeholder = { Text("\u98DF\u8C31\u96C6\u540D\u79F0") },  // 食谱集名称
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else {
+                        cookbooks.forEach { cookbook ->
+                            TextButton(
+                                onClick = {
+                                    selectedRecipeIds.forEach { recipeId ->
+                                        viewModel.addRecipeToCookbook(recipeId, cookbook.id)
+                                    }
+                                    showCookbookDialog = false
+                                    viewModel.toggleMultiSelectMode()
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(cookbook.title, modifier = Modifier.fillMaxWidth())
+                            }
+                        }
+                        TextButton(
+                            onClick = { showNewCookbookInDialog = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "+ \u65B0\u5EFA\u98DF\u8C31\u96C6",  // + 新建食谱集
+                                modifier = Modifier.fillMaxWidth(),
+                                color = Primary
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (showNewCookbookInDialog) {
+                    TextButton(
+                        onClick = {
+                            if (newCookbookNameInDialog.isNotBlank()) {
+                                viewModel.createCookbook(newCookbookNameInDialog.trim())
+                                newCookbookNameInDialog = ""
+                                showNewCookbookInDialog = false
+                            }
+                        }
+                    ) {
+                        Text("\u521B\u5EFA")  // 创建
+                    }
+                } else {
+                    TextButton(onClick = { showCookbookDialog = false }) {
+                        Text("\u53D6\u6D88")  // 取消
+                    }
+                }
+            },
+            dismissButton = {
+                if (showNewCookbookInDialog) {
+                    TextButton(onClick = {
+                        showNewCookbookInDialog = false
+                        newCookbookNameInDialog = ""
+                    }) {
+                        Text("\u8FD4\u56DE")  // 返回
+                    }
+                }
+            }
+        )
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// Recipe grid content
+// ──────────────────────────────────────────────────────────
+@Composable
+private fun RecipeGridContent(
+    recipes: List<Recipe>,
+    isGenerating: Boolean,
+    generatedRecipe: Recipe?,
+    importProgress: com.example.pullit.data.model.RecipeGenerationProgress?,
+    pendingTitle: String?,
+    pendingCoverUrl: String?,
+    showFavoritesOnly: Boolean,
+    searchQuery: String,
+    isMultiSelectMode: Boolean,
+    selectedRecipeIds: Set<String>,
+    onRecipeTap: (String) -> Unit,
+    onFavoriteTap: (Recipe) -> Unit,
+    onGeneratedRecipeTap: (Recipe) -> Unit
+) {
+    // Determine if we should show the generating card
+    val showGeneratingCard = isGenerating || generatedRecipe != null
+
+    // Filter out the generated recipe from normal list to avoid duplicates
+    val displayRecipes = if (showGeneratingCard && generatedRecipe != null) {
+        recipes.filter { it.id != generatedRecipe.id }
+    } else recipes
+
+    if (!showGeneratingCard && displayRecipes.isEmpty()) {
+        // Empty states
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                val (emoji, title, subtitle) = when {
+                    showFavoritesOnly -> Triple(
+                        "\u2764\uFE0F",
+                        "\u8FD8\u6CA1\u6709\u6536\u85CF\u7684\u98DF\u8C31",       // 还没有收藏的食谱
+                        "\u70B9\u51FB\u7231\u5FC3\u6536\u85CF\u4F60\u559C\u6B22\u7684\u98DF\u8C31"  // 点击爱心收藏你喜欢的食谱
+                    )
+                    searchQuery.isNotBlank() -> Triple(
+                        "\uD83D\uDD0D",
+                        "\u6CA1\u6709\u627E\u5230\u76F8\u5173\u98DF\u8C31",       // 没有找到相关食谱
+                        "\u8BD5\u8BD5\u5176\u4ED6\u5173\u952E\u8BCD"                // 试试其他关键词
+                    )
+                    else -> Triple(
+                        "\uD83C\uDF73",
+                        "\u8FD8\u6CA1\u6709\u98DF\u8C31",                          // 还没有食谱
+                        "\u70B9\u51FB + \u5BFC\u5165\u4F60\u7684\u7B2C\u4E00\u4E2A\u98DF\u8C31"  // 点击 + 导入你的第一个食谱
+                    )
+                }
+                Text(emoji, fontSize = 60.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    title,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    subtitle,
+                    fontSize = 14.sp,
+                    color = TextSecondary
+                )
+            }
+        }
+        return
+    }
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 80.dp)
+    ) {
+        // IMPORTANT: If isGenerating is true, show GeneratingRecipeCard as the FIRST item
+        if (showGeneratingCard) {
+            item(key = "generating_card") {
+                GeneratingRecipeCard(
+                    isGenerating = isGenerating,
+                    generatedRecipe = generatedRecipe,
+                    progress = importProgress,
+                    pendingTitle = pendingTitle,
+                    pendingCoverUrl = pendingCoverUrl,
+                    onTap = {
+                        generatedRecipe?.let { onGeneratedRecipeTap(it) }
+                    }
+                )
+            }
+        }
+
+        items(displayRecipes, key = { it.id }) { recipe ->
+            RecipeCardView(
+                recipe = recipe,
+                onTap = { onRecipeTap(recipe.id) },
+                onFavoriteTap = if (!isMultiSelectMode) {
+                    { onFavoriteTap(recipe) }
+                } else null,
+                isSelected = isMultiSelectMode && recipe.id in selectedRecipeIds
+            )
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// Generating recipe card (shown in grid while importing)
+// ──────────────────────────────────────────────────────────
+@Composable
+private fun GeneratingRecipeCard(
+    isGenerating: Boolean,
+    generatedRecipe: Recipe?,
+    progress: com.example.pullit.data.model.RecipeGenerationProgress?,
+    pendingTitle: String?,
+    pendingCoverUrl: String?,
+    onTap: () -> Unit
+) {
+    val cardShape = RoundedCornerShape(16.dp)
+    val isCompleted = generatedRecipe != null && !isGenerating
+
+    // Display title: completed recipe > pending > fallback
+    val displayTitle = when {
+        isCompleted -> generatedRecipe!!.title
+        !pendingTitle.isNullOrBlank() -> pendingTitle
+        else -> "\u6B63\u5728\u751F\u6210\u98DF\u8C31..."  // 正在生成食谱...
+    }
+
+    // Display cover URL: completed recipe image > pending cover
+    val displayCoverUrl = when {
+        isCompleted && !generatedRecipe!!.imageUrl.isNullOrBlank() -> generatedRecipe.imageUrl
+        !pendingCoverUrl.isNullOrBlank() -> pendingCoverUrl
+        else -> null
+    }
+
+    val hasPreview = displayCoverUrl != null || !pendingTitle.isNullOrBlank()
+
+    // Animated progress value
+    var progressValue by remember { mutableFloatStateOf(0f) }
+    val animatedProgress by animateFloatAsState(
+        targetValue = progressValue,
+        animationSpec = tween(400),
+        label = "progress_anim"
+    )
+
+    // Simulated progress that monotonically increases
+    LaunchedEffect(isCompleted) {
+        if (isCompleted) {
+            progressValue = 1f
+            return@LaunchedEffect
+        }
+        while (true) {
+            kotlinx.coroutines.delay(800)
+            val remaining = 0.95f - progressValue
+            if (remaining <= 0.01f) break
+            val increment = remaining * (0.03f + Math.random().toFloat() * 0.05f)
+            progressValue = (progressValue + increment).coerceAtMost(0.95f)
+        }
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = isCompleted, onClick = onTap),
+        shape = cardShape,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 6.dp
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Image section
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (displayCoverUrl != null) {
+                    // Show cover image — desaturated during generation, full color when completed
+                    AsyncImage(
+                        model = displayCoverUrl,
+                        contentDescription = displayTitle,
+                        contentScale = ContentScale.Crop,
+                        colorFilter = if (isCompleted) null else ColorFilter.colorMatrix(
+                            androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(0.3f) }
+                        ),
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    // Dim overlay during generation
+                    if (!isCompleted) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.15f))
+                        )
+                    }
+                } else if (!isCompleted) {
+                    // No cover: gradient background with toaster animation
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Primary.copy(alpha = 0.06f),
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        MiniToasterView(modifier = Modifier.size(100.dp))
+                    }
+                } else {
+                    // Completed without cover
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Primary.copy(alpha = 0.15f),
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Outlined.Restaurant,
+                            contentDescription = null,
+                            tint = Primary.copy(alpha = 0.3f),
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+                }
+
+                // NEW badge (completed only)
+                if (isCompleted) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Primary)
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            "NEW",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Progress bar at bottom of image (generating only)
+                if (!isCompleted && isGenerating) {
+                    LinearProgressIndicator(
+                        progress = { animatedProgress },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                        color = Primary,
+                        trackColor = Color.White.copy(alpha = 0.3f)
+                    )
+                }
+            }
+
+            // Title + status section
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp)
+            ) {
+                Text(
+                    text = displayTitle,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (isCompleted) MaterialTheme.colorScheme.onSurface else TextTertiary,
+                    modifier = Modifier.defaultMinSize(minHeight = 36.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                if (isCompleted) {
+                    Text(
+                        "\u70B9\u51FB\u67E5\u770B\u98DF\u8C31",  // 点击查看食谱
+                        fontSize = 11.sp,
+                        color = Success,
+                        fontWeight = FontWeight.Medium
+                    )
+                } else {
+                    Text(
+                        progress?.message ?: "\u6B63\u5728\u5904\u7406...",  // 正在处理...
+                        fontSize = 11.sp,
+                        color = TextTertiary,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// Cookbook list content (placeholder for Cookbooks tab)
+// ──────────────────────────────────────────────────────────
+@Composable
+private fun CookbookListContent(
+    cookbooks: List<com.example.pullit.data.model.Cookbook>,
+    viewModel: RecipeListViewModel,
+    onRecipeTap: (String) -> Unit
+) {
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var newCookbookTitle by remember { mutableStateOf("") }
+
+    if (cookbooks.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("\uD83D\uDCDA", fontSize = 60.sp)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    "\u8FD8\u6CA1\u6709\u98DF\u8C31\u96C6",  // 还没有食谱集
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "\u521B\u5EFA\u98DF\u8C31\u96C6\u6765\u6574\u7406\u4F60\u7684\u98DF\u8C31",  // 创建食谱集来整理你的食谱
+                    fontSize = 14.sp,
+                    color = TextSecondary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = { showCreateDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        "\u521B\u5EFA\u98DF\u8C31\u96C6",  // 创建食谱集
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    } else {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(bottom = 80.dp)
+        ) {
+            // "Create new" card
+            item(key = "create_cookbook") {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clickable { showCreateDialog = true },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                tint = Primary,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                "\u65B0\u5EFA\u98DF\u8C31\u96C6",  // 新建食谱集
+                                fontSize = 13.sp,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
+
+            items(cookbooks, key = { it.id }) { cookbook ->
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .clickable { viewModel.setSelectedCookbook(cookbook.id) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 4.dp
+                ) {
+                    Box(
+                        modifier = Modifier.padding(12.dp),
+                        contentAlignment = Alignment.BottomStart
+                    ) {
+                        Text(
+                            cookbook.title,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Create cookbook dialog
+    if (showCreateDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateDialog = false; newCookbookTitle = "" },
+            title = { Text("\u65B0\u5EFA\u98DF\u8C31\u96C6") },  // 新建食谱集
+            text = {
+                OutlinedTextField(
+                    value = newCookbookTitle,
+                    onValueChange = { newCookbookTitle = it },
+                    placeholder = { Text("\u98DF\u8C31\u96C6\u540D\u79F0") },  // 食谱集名称
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newCookbookTitle.isNotBlank()) {
+                            viewModel.createCookbook(newCookbookTitle.trim())
+                            newCookbookTitle = ""
+                            showCreateDialog = false
+                        }
+                    }
+                ) {
+                    Text("\u521B\u5EFA", color = Primary)  // 创建
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateDialog = false; newCookbookTitle = "" }) {
+                    Text("\u53D6\u6D88")  // 取消
+                }
+            }
+        )
     }
 }

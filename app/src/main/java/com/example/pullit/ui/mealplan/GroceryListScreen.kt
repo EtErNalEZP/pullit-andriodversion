@@ -1,23 +1,32 @@
 package com.example.pullit.ui.mealplan
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.pullit.ui.theme.Primary
+import com.example.pullit.data.model.GroceryItem
+import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.MealPlanViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,81 +37,238 @@ fun GroceryListScreen(
 ) {
     val groceryItems by viewModel.groceryItems.collectAsState()
     var newItemName by remember { mutableStateOf("") }
-    var showAddField by remember { mutableStateOf(false) }
+
+    val toBuyItems = groceryItems.filter { !it.checked }
+    val boughtItems = groceryItems.filter { it.checked }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Grocery List") },
-                navigationIcon = { IconButton(onClick = { navController.popBackStack() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } },
-                actions = {
-                    if (groceryItems.any { it.checked }) {
-                        TextButton(onClick = { viewModel.clearCheckedGroceries() }) { Text("Clear bought") }
-                    }
-                    IconButton(onClick = { viewModel.clearAllGroceries() }) {
-                        Icon(Icons.Outlined.DeleteSweep, "Clear all")
+                title = { Text("Grocery List", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAddField = true }, containerColor = Primary) {
-                Icon(Icons.Default.Add, "Add", tint = androidx.compose.ui.graphics.Color.White)
-            }
         }
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.padding(padding),
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            if (showAddField) {
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = newItemName, onValueChange = { newItemName = it },
-                            placeholder = { Text("Item name") },
-                            modifier = Modifier.weight(1f), singleLine = true
+            // Add item field at top
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = newItemName,
+                        onValueChange = { newItemName = it },
+                        placeholder = { Text("Add an item...", color = TextTertiary) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
                         )
-                        Spacer(Modifier.width(8.dp))
-                        Button(onClick = {
-                            if (newItemName.isNotBlank()) { viewModel.addCustomGroceryItem(newItemName); newItemName = ""; showAddField = false }
-                        }, colors = ButtonDefaults.buttonColors(containerColor = Primary)) { Text("Add") }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            if (newItemName.isNotBlank()) {
+                                viewModel.addCustomGroceryItem(newItemName.trim())
+                                newItemName = ""
+                            }
+                        },
+                        enabled = newItemName.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Text("Add", fontWeight = FontWeight.SemiBold, color = Color.White)
                     }
-                    Spacer(Modifier.height(8.dp))
                 }
             }
 
             if (groceryItems.isEmpty()) {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
-                        Text("No items yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 48.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.ShoppingCart,
+                                contentDescription = null,
+                                modifier = Modifier.size(56.dp),
+                                tint = TextTertiary
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                "No items yet",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = TextSecondary
+                            )
+                            Text(
+                                "Add items or generate from your meal plan",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextTertiary
+                            )
+                        }
                     }
                 }
             }
 
-            items(groceryItems.sortedBy { it.checked }, key = { it.id }) { item ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = item.checked,
-                        onCheckedChange = { viewModel.toggleGroceryChecked(item) },
-                        colors = CheckboxDefaults.colors(checkedColor = Primary)
+            // "To Buy" section
+            if (toBuyItems.isNotEmpty()) {
+                item {
+                    Text(
+                        "To Buy",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 8.dp)
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            item.name,
-                            fontWeight = FontWeight.Medium,
-                            textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
-                            color = if (item.checked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
-                        )
-                        if (item.amount.isNotBlank()) {
-                            Text(item.amount, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                items(toBuyItems, key = { it.id }) { item ->
+                    GroceryItemRow(
+                        item = item,
+                        onToggle = { viewModel.toggleGroceryChecked(item) }
+                    )
+                }
+            }
+
+            // "Bought" section
+            if (boughtItems.isNotEmpty()) {
+                item {
+                    Text(
+                        "Bought",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextSecondary,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
+
+                items(boughtItems, key = { it.id }) { item ->
+                    GroceryItemRow(
+                        item = item,
+                        onToggle = { viewModel.toggleGroceryChecked(item) }
+                    )
+                }
+            }
+
+            // Bottom buttons
+            if (groceryItems.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (boughtItems.isNotEmpty()) {
+                            OutlinedButton(
+                                onClick = { viewModel.clearCheckedGroceries() },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = TextSecondary
+                                )
+                            ) {
+                                Icon(Icons.Outlined.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Clear Bought")
+                            }
+                        }
+
+                        TextButton(
+                            onClick = { viewModel.clearAllGroceries() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Clear All", color = Error)
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GroceryItemRow(
+    item: GroceryItem,
+    onToggle: () -> Unit
+) {
+    val isChecked = item.checked
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onToggle)
+            .padding(vertical = 8.dp, horizontal = 4.dp)
+            .animateContentSize(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Custom checkbox: filled circle when checked, empty circle when not
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .then(
+                    if (isChecked) Modifier.background(Success)
+                    else Modifier.border(2.dp, TextTertiary, CircleShape)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isChecked) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = "Checked",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .then(if (isChecked) Modifier.padding() else Modifier)
+        ) {
+            Text(
+                item.name,
+                fontWeight = FontWeight.Medium,
+                textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None,
+                color = if (isChecked)
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                else
+                    MaterialTheme.colorScheme.onSurface
+            )
+            if (item.amount.isNotBlank()) {
+                Text(
+                    item.amount,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isChecked) TextTertiary.copy(alpha = 0.5f) else TextSecondary,
+                    textDecoration = if (isChecked) TextDecoration.LineThrough else TextDecoration.None
+                )
+            }
+            if (!item.fromRecipesJson.isNullOrBlank() && item.fromRecipesJson != "[]") {
+                Text(
+                    "From meal plan",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextTertiary,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
             }
         }
     }

@@ -18,6 +18,9 @@ interface MealPlanDao {
     @Query("DELETE FROM meal_plan_items WHERE id = :id")
     suspend fun deleteById(id: String)
 
+    @Query("SELECT EXISTS(SELECT 1 FROM meal_plan_items WHERE recipeId = :recipeId)")
+    suspend fun existsByRecipeId(recipeId: String): Boolean
+
     @Query("DELETE FROM meal_plan_items")
     suspend fun deleteAll()
 }

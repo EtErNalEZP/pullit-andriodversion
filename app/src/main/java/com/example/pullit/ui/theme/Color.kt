@@ -33,7 +33,16 @@ val Warning = Color(0xFFE8C164)
 val Error = Color(0xFFD9736B)
 val Info = Color(0xFF7AAFCB)
 
+// Warm tint
+val WarmTintLight = Color(0xFFFFF8F2)
+val WarmTintDark = Color(0xFF352D26)
+val PrimaryMutedLight = Color(0x1AE8A87C)  // 10% opacity
+val PrimaryMutedDark = Color(0x26E8A87C)   // 15% opacity
+
 // Cooking mode
 val CookingBg = Color(0xFF1C1714)
 val CookingCard = Color(0xFF2A231E)
 val CookingText = Color(0xFFE8DDD2)
+
+// Shadow
+val WarmShadow = Color(0xFF3D2C1E)

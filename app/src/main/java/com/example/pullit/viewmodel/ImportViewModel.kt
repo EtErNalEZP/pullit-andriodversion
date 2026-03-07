@@ -1,6 +1,7 @@
 package com.example.pullit.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pullit.data.local.AppDatabase
@@ -38,6 +39,12 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
     private val _generatedRecipe = MutableStateFlow<Recipe?>(null)
     val generatedRecipe: StateFlow<Recipe?> = _generatedRecipe.asStateFlow()
 
+    private val _pendingTitle = MutableStateFlow<String?>(null)
+    val pendingTitle: StateFlow<String?> = _pendingTitle.asStateFlow()
+
+    private val _pendingCoverUrl = MutableStateFlow<String?>(null)
+    val pendingCoverUrl: StateFlow<String?> = _pendingCoverUrl.asStateFlow()
+
     fun setInputText(text: String) { _inputText.value = text }
     fun setImportMethod(method: ImportMethod) { _importMethod.value = method }
     fun clearError() { _error.value = null }
@@ -66,13 +73,16 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
 
         try {
             val platform = detectPlatform(text)
+            Log.d("ImportVM", "Importing from platform=$platform, text=$text")
 
             when (platform) {
                 "xiachufang" -> importFromXiachufang(text)
                 "xiaohongshu" -> importFromXiaohongshu(text)
                 else -> importFromVideo(text)
             }
+            Log.d("ImportVM", "Import success: ${_generatedRecipe.value?.title}")
         } catch (e: Exception) {
+            Log.e("ImportVM", "Import failed", e)
             _error.value = when (e) {
                 is ApiError.HttpError -> "HTTP ${e.code}: ${e.msg}"
                 is ApiError.NetworkError -> "Network error: ${e.cause?.message}"
@@ -88,6 +98,10 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
     private suspend fun importFromXiachufang(text: String) {
         val url = XiachufangService.extractUrl(text) ?: text
         val result = XiachufangService.parseUrl(url)
+
+        // Set pending preview info for the loading card
+        _pendingTitle.value = result.title.takeIf { it.isNotBlank() }
+        _pendingCoverUrl.value = result.imageUrl
 
         val ingredientsJson = json.encodeToString(
             kotlinx.serialization.builtins.ListSerializer(Ingredient.serializer()), result.ingredients
@@ -113,6 +127,10 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
 
     private suspend fun importFromXiaohongshu(text: String) {
         val content = XiaohongshuService.fetchContent(text)
+
+        // Set pending preview info for the loading card
+        _pendingTitle.value = content.title.takeIf { it.isNotBlank() }
+        _pendingCoverUrl.value = content.coverUrl
 
         if (content.useBackendDirectly || content.videoUrl != null) {
             val recipe = RecipeGenerationService.generateRecipe(
@@ -192,5 +210,7 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
         _progress.value = null
         _error.value = null
         _generatedRecipe.value = null
+        _pendingTitle.value = null
+        _pendingCoverUrl.value = null
     }
 }

@@ -1,5 +1,8 @@
 package com.example.pullit.ui.navigation
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -18,7 +21,6 @@ import com.example.pullit.ui.ai.AiRecommendScreen
 import com.example.pullit.ui.auth.AuthScreen
 import com.example.pullit.ui.auth.DisplayNameSetupScreen
 import com.example.pullit.ui.cooking.CookingModeScreen
-import com.example.pullit.ui.import_recipe.ImportSheet
 import com.example.pullit.ui.mealplan.GroceryListScreen
 import com.example.pullit.ui.mealplan.MealPlanScreen
 import com.example.pullit.ui.more.MoreScreen
@@ -28,6 +30,8 @@ import com.example.pullit.ui.recipes.RecipeListScreen
 import com.example.pullit.ui.recipes.RouletteScreen
 import com.example.pullit.ui.ai.SuggestionDetailScreen
 import com.example.pullit.auth.AuthManager
+import com.example.pullit.viewmodel.ImportViewModel
+import com.example.pullit.viewmodel.RecipeListViewModel
 
 sealed class Screen(val route: String) {
     data object Auth : Screen("auth")
@@ -95,6 +99,7 @@ fun AppNavigation(authManager: AuthManager) {
     }
 
     Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
@@ -124,7 +129,11 @@ fun AppNavigation(authManager: AuthManager) {
         NavHost(
             navController = navController,
             startDestination = startDestination,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding),
+            enterTransition = { slideInHorizontally(tween(300)) { it } + fadeIn(tween(300)) },
+            exitTransition = { slideOutHorizontally(tween(300)) { -it / 3 } + fadeOut(tween(150)) },
+            popEnterTransition = { slideInHorizontally(tween(300)) { -it / 3 } + fadeIn(tween(300)) },
+            popExitTransition = { slideOutHorizontally(tween(300)) { it } + fadeOut(tween(150)) }
         ) {
             composable(Screen.Auth.route) {
                 AuthScreen(authManager = authManager, onAuthSuccess = {
@@ -145,7 +154,20 @@ fun AppNavigation(authManager: AuthManager) {
                 })
             }
             composable(Screen.RecipeList.route) {
-                RecipeListScreen(navController = navController)
+                val recipeListViewModel: RecipeListViewModel = viewModel()
+                val importViewModel: ImportViewModel = viewModel()
+                RecipeListScreen(
+                    viewModel = recipeListViewModel,
+                    importViewModel = importViewModel,
+                    authManager = authManager,
+                    onRecipeTap = { recipeId ->
+                        navController.navigate(Screen.RecipeDetail.createRoute(recipeId))
+                    },
+                    onRouletteClick = {
+                        navController.navigate(Screen.Roulette.route)
+                    },
+                    onImportClick = { /* handled by internal bottom sheet */ }
+                )
             }
             composable(Screen.RecipeDetail.route) { backStackEntry ->
                 val recipeId = backStackEntry.arguments?.getString("recipeId") ?: return@composable
@@ -155,9 +177,7 @@ fun AppNavigation(authManager: AuthManager) {
                 val recipeId = backStackEntry.arguments?.getString("recipeId") ?: return@composable
                 RecipeEditScreen(recipeId = recipeId, navController = navController)
             }
-            composable(Screen.Import.route) {
-                ImportSheet(navController = navController)
-            }
+            // ImportSheet is now shown as modal from RecipeListScreen
             composable(Screen.Roulette.route) {
                 RouletteScreen(navController = navController)
             }

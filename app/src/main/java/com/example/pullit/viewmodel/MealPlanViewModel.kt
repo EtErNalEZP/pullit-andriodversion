@@ -26,6 +26,7 @@ class MealPlanViewModel(application: Application) : AndroidViewModel(application
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun addToMealPlan(recipeId: String, servings: Int = 1) = viewModelScope.launch {
+        if (mealPlanDao.existsByRecipeId(recipeId)) return@launch
         mealPlanDao.upsert(MealPlanItem(
             id = "mp_${System.currentTimeMillis()}", recipeId = recipeId, servings = servings
         ))
@@ -79,4 +80,10 @@ class MealPlanViewModel(application: Application) : AndroidViewModel(application
     fun clearCheckedGroceries() = viewModelScope.launch { groceryDao.deleteChecked() }
 
     fun clearAllGroceries() = viewModelScope.launch { groceryDao.deleteAll() }
+
+    fun updateServings(item: MealPlanItem, newServings: Int) = viewModelScope.launch {
+        if (newServings >= 1) {
+            mealPlanDao.upsert(item.copy(servings = newServings))
+        }
+    }
 }
