@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.lazy.grid.*
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -99,6 +101,32 @@ fun RecipeListScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     var showCookbookDialog by remember { mutableStateOf(false) }
     var showImportSheet by remember { mutableStateOf(false) }
+    var showRecommendationSheet by remember { mutableStateOf(false) }
+    var recommendationRecipe by remember { mutableStateOf<Recipe?>(null) }
+
+    // Auto-show cookbook recommendation when generation completes with labels
+    LaunchedEffect(generatedRecipe, isGenerating) {
+        if (!isGenerating && generatedRecipe != null) {
+            val labels = generatedRecipe!!.labelsJson?.let {
+                runCatching {
+                    kotlinx.serialization.json.Json.decodeFromString<com.example.pullit.data.model.RecipeLabels>(it)
+                }.getOrNull()
+            }
+            if (labels != null && !labels.isEmpty) {
+                recommendationRecipe = generatedRecipe
+                showRecommendationSheet = true
+            }
+        }
+    }
+
+    // Cookbook recommendation sheet
+    if (showRecommendationSheet && recommendationRecipe != null) {
+        CookbookRecommendationSheet(
+            recipe = recommendationRecipe!!,
+            viewModel = viewModel,
+            onDismiss = { showRecommendationSheet = false }
+        )
+    }
 
     // Import bottom sheet
     if (showImportSheet) {
@@ -298,9 +326,10 @@ fun RecipeListScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .height(38.dp)
                         .clip(RoundedCornerShape(10.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 12.dp, vertical = 2.dp),
+                        .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -310,28 +339,26 @@ fun RecipeListScreen(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    TextField(
+                    BasicTextField(
                         value = searchQuery,
                         onValueChange = { viewModel.setSearchQuery(it) },
-                        placeholder = {
-                            Text(
-                                S.searchRecipes,
-                                color = TextTertiary,
-                                fontSize = 14.sp
-                            )
-                        },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                            cursorColor = Primary
+                        textStyle = LocalTextStyle.current.copy(
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
                         ),
-                        textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
+                        cursorBrush = SolidColor(Primary),
+                        decorationBox = { innerTextField ->
+                            if (searchQuery.isEmpty()) {
+                                Text(
+                                    S.searchRecipes,
+                                    color = TextTertiary,
+                                    fontSize = 14.sp
+                                )
+                            }
+                            innerTextField()
+                        }
                     )
                 }
 

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.pullit.data.local.AppDatabase
 import com.example.pullit.data.model.Cookbook
 import com.example.pullit.data.model.Recipe
+import com.example.pullit.data.model.RecipeLabels
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -130,5 +131,21 @@ class RecipeListViewModel(application: Application) : AndroidViewModel(applicati
             runCatching { json.decodeFromString<List<String>>(it) }.getOrDefault(emptyList())
         } ?: emptyList()
         return recipes.value.filter { it.id in recipeIds }
+    }
+
+    fun updateRecipeLabels(recipeId: String, labels: RecipeLabels) = viewModelScope.launch {
+        val recipe = recipeDao.getById(recipeId) ?: return@launch
+        val labelsJson = json.encodeToString(RecipeLabels.serializer(), labels)
+        recipeDao.upsert(recipe.copy(labelsJson = labelsJson))
+    }
+
+    fun createCookbookWithTags(title: String, recipeId: String, tags: List<String>) = viewModelScope.launch {
+        val cookbook = Cookbook(
+            id = java.util.UUID.randomUUID().toString(),
+            title = title,
+            recipeIdsJson = json.encodeToString<List<String>>(listOf(recipeId)),
+            tagsJson = if (tags.isNotEmpty()) json.encodeToString<List<String>>(tags) else null
+        )
+        cookbookDao.upsert(cookbook)
     }
 }
