@@ -1,6 +1,8 @@
 package com.example.pullit.ui.recipes
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.view.View
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -28,6 +30,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -83,6 +86,7 @@ fun RecipeDetailScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
     var showCookbookDialog by remember { mutableStateOf(false) }
+    var showShareSheet by remember { mutableStateOf(false) }
     val cookbooks by viewModel.cookbooks.collectAsState()
     var servingCount by remember(r) { mutableIntStateOf(r.servings) }
     val servingRatio = if (r.servings > 0) servingCount.toFloat() / r.servings.toFloat() else 1f
@@ -200,6 +204,91 @@ fun RecipeDetailScreen(
         )
     }
 
+    // Share sheet
+    if (showShareSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showShareSheet = false },
+            containerColor = MaterialTheme.colorScheme.background
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                Text(
+                    "\u5206\u4EAB\u98DF\u8C31",  // 分享食谱
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                // Share as Text
+                Surface(
+                    onClick = {
+                        showShareSheet = false
+                        shareAsText(context, r, ingredients, steps)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Outlined.Description,
+                            contentDescription = null,
+                            tint = Primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                "\u4EE5\u6587\u5B57\u5206\u4EAB",  // 以文字分享
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                "\u590D\u5236\u98DF\u8C31\u6587\u5B57\u5185\u5BB9",  // 复制食谱文字内容
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                // Share as Image
+                Surface(
+                    onClick = {
+                        showShareSheet = false
+                        shareAsImage(context, r, ingredients, steps)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Outlined.Image,
+                            contentDescription = null,
+                            tint = Primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                "\u4EE5\u56FE\u7247\u5206\u4EAB",  // 以图片分享
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                "\u751F\u6210\u98DF\u8C31\u5361\u7247\u56FE\u7247",  // 生成食谱卡片图片
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
@@ -213,18 +302,7 @@ fun RecipeDetailScreen(
                 },
                 actions = {
                     // Share
-                    IconButton(onClick = {
-                        val shareText = buildString {
-                            append(r.title)
-                            r.desc?.let { append("\n$it") }
-                            r.sourceUrl?.let { append("\n$it") }
-                        }
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareText)
-                        }
-                        context.startActivity(Intent.createChooser(intent, "Share Recipe"))
-                    }) {
+                    IconButton(onClick = { showShareSheet = true }) {
                         Icon(Icons.Outlined.Share, "Share")
                     }
 
@@ -958,6 +1036,191 @@ private fun buildHighlightedText(
         }
         if (lastEnd < text.length) {
             append(text.substring(lastEnd))
+        }
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// Share helpers
+// ──────────────────────────────────────────────────────────
+
+private fun shareAsText(
+    context: android.content.Context,
+    recipe: com.example.pullit.data.model.Recipe,
+    ingredients: List<Ingredient>,
+    steps: List<Step>
+) {
+    val text = buildString {
+        appendLine(recipe.title)
+        recipe.desc?.takeIf { it.isNotBlank() }?.let { appendLine(it) }
+        appendLine()
+        recipe.cookTime?.takeIf { it.isNotBlank() }?.let { appendLine("\u23F1 $it") }
+        appendLine("\uD83D\uDCCB \u98DF\u6750")  // 📋 食材
+        for (ing in ingredients) {
+            appendLine("\u2022 ${ing.name} ${ing.amount}")
+        }
+        appendLine()
+        appendLine("\uD83D\uDC69\u200D\uD83C\uDF73 \u6B65\u9AA4")  // 👩‍🍳 步骤
+        for (step in steps) {
+            appendLine("${step.order}. ${step.instruction}")
+        }
+        recipe.sourceUrl?.takeIf { it.isNotBlank() && !it.startsWith("local:") }?.let {
+            appendLine()
+            append("\u6765\u6E90: $it")  // 来源:
+        }
+        appendLine()
+        append("\u2014 Pullit Recipes")
+    }
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(Intent.createChooser(intent, null))
+}
+
+private fun shareAsImage(
+    context: android.content.Context,
+    recipe: com.example.pullit.data.model.Recipe,
+    ingredients: List<Ingredient>,
+    steps: List<Step>
+) {
+    // Render a recipe card to bitmap using ComposeView
+    val composeView = ComposeView(context).apply {
+        setContent {
+            com.example.pullit.ui.theme.PullitTheme {
+                RecipeShareCard(recipe = recipe, ingredients = ingredients, steps = steps)
+            }
+        }
+    }
+
+    // Measure and layout at 390dp width
+    val density = context.resources.displayMetrics.density
+    val widthPx = (390 * density).toInt()
+    val widthSpec = View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY)
+    val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+    composeView.measure(widthSpec, heightSpec)
+    composeView.layout(0, 0, composeView.measuredWidth, composeView.measuredHeight)
+
+    val bitmap = Bitmap.createBitmap(
+        composeView.measuredWidth, composeView.measuredHeight, Bitmap.Config.ARGB_8888
+    )
+    val canvas = android.graphics.Canvas(bitmap)
+    composeView.draw(canvas)
+
+    // Save to cache and share
+    val file = java.io.File(context.cacheDir, "share_recipe.png")
+    file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    val uri = androidx.core.content.FileProvider.getUriForFile(
+        context, "${context.packageName}.fileprovider", file
+    )
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, null))
+}
+
+@Composable
+private fun RecipeShareCard(
+    recipe: com.example.pullit.data.model.Recipe,
+    ingredients: List<Ingredient>,
+    steps: List<Step>
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Title
+        Text(
+            recipe.title,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        // Description
+        recipe.desc?.takeIf { it.isNotBlank() }?.let {
+            Text(it, fontSize = 14.sp, color = TextSecondary)
+        }
+
+        // Meta row
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            recipe.cookTime?.takeIf { it.isNotBlank() }?.let {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Schedule, null, modifier = Modifier.size(14.dp), tint = TextSecondary)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(it, fontSize = 12.sp, color = TextSecondary)
+                }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Person, null, modifier = Modifier.size(14.dp), tint = TextSecondary)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("${recipe.servings} \u4EFD", fontSize = 12.sp, color = TextSecondary)  // 份
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        // Ingredients
+        Text(
+            "\u98DF\u6750",  // 食材
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        ingredients.forEach { ing ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text("\u2022 ", fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground)
+                Text(ing.name, fontSize = 13.sp, color = MaterialTheme.colorScheme.onBackground)
+                Spacer(modifier = Modifier.weight(1f))
+                Text(ing.amount, fontSize = 13.sp, color = TextSecondary)
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        // Steps
+        Text(
+            "\u6B65\u9AA4",  // 步骤
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        steps.forEach { step ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    "${step.order}.",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Primary,
+                    modifier = Modifier.width(20.dp)
+                )
+                Text(
+                    step.instruction,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+        // Footer
+        Row(modifier = Modifier.fillMaxWidth()) {
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                "Pullit Recipes",
+                fontSize = 11.sp,
+                color = TextTertiary
+            )
         }
     }
 }
