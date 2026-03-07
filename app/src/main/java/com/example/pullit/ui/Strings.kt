@@ -233,6 +233,12 @@ data class AppStrings(
     val privacyEncryptionDetail: String,
     val privacyPolicyLink: String,
     val privacyAgreeButton: String,
+
+    // ── Update ──
+    val updateAvailable: String,
+    val updateMessage: String,
+    val updateNow: String,
+    val updateLater: String,
 )
 
 val EnglishStrings = AppStrings(
@@ -433,6 +439,10 @@ val EnglishStrings = AppStrings(
     privacyEncryptionDetail = "All data is transmitted via HTTPS encryption between your device and our servers.",
     privacyPolicyLink = "View Full Privacy Policy",
     privacyAgreeButton = "Agree & Continue",
+    updateAvailable = "Update Available",
+    updateMessage = "A new version is available. Please download the latest version from our website.",
+    updateNow = "Update Now",
+    updateLater = "Later",
 )
 
 val ChineseStrings = AppStrings(
@@ -633,6 +643,10 @@ val ChineseStrings = AppStrings(
     privacyEncryptionDetail = "你的设备与我们服务器之间的所有数据传输均通过 HTTPS 加密。",
     privacyPolicyLink = "查看完整隐私政策",
     privacyAgreeButton = "同意并继续",
+    updateAvailable = "发现新版本",
+    updateMessage = "有新版本可用，请前往官网下载最新版本。",
+    updateNow = "立即更新",
+    updateLater = "稍后",
 )
 
 val LocalStrings = compositionLocalOf { EnglishStrings }

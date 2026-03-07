@@ -1,5 +1,7 @@
 package com.example.pullit.ui.navigation
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.WindowInsets
@@ -11,12 +13,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.pullit.BuildConfig
+import com.example.pullit.service.ApiClient
 import com.example.pullit.ui.ai.AiRecommendScreen
 import com.example.pullit.ui.auth.AuthScreen
 import com.example.pullit.ui.auth.DisplayNameSetupScreen
@@ -31,8 +37,10 @@ import com.example.pullit.ui.recipes.RouletteScreen
 import com.example.pullit.ui.ai.SuggestionDetailScreen
 import com.example.pullit.auth.AuthManager
 import com.example.pullit.ui.LocalStrings
+import com.example.pullit.ui.theme.Primary
 import com.example.pullit.viewmodel.ImportViewModel
 import com.example.pullit.viewmodel.RecipeListViewModel
+import kotlinx.serialization.Serializable
 
 sealed class Screen(val route: String) {
     data object Auth : Screen("auth")
@@ -69,11 +77,51 @@ data class BottomNavItem(
     val unselectedIcon: ImageVector
 )
 
+@Serializable
+private data class VersionResponse(val android: String)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavigation(authManager: AuthManager) {
     val S = LocalStrings.current
+    val context = LocalContext.current
     val navController = rememberNavController()
+
+    // ── Version check ──
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        try {
+            val response = ApiClient.get<VersionResponse>("/api/version")
+            if (response.android != BuildConfig.VERSION_NAME) {
+                showUpdateDialog = true
+            }
+        } catch (_: Exception) {
+            // Silently ignore — don't block app if check fails
+        }
+    }
+
+    if (showUpdateDialog) {
+        AlertDialog(
+            onDismissRequest = { showUpdateDialog = false },
+            title = { Text(S.updateAvailable, fontWeight = FontWeight.Bold) },
+            text = { Text(S.updateMessage) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showUpdateDialog = false
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse("https://pullit-landing.up.railway.app"))
+                    )
+                }) {
+                    Text(S.updateNow, color = Primary, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUpdateDialog = false }) {
+                    Text(S.updateLater)
+                }
+            }
+        )
+    }
 
     val bottomNavItems = listOf(
         BottomNavItem(Screen.RecipeList, S.recipes, Icons.Filled.MenuBook, Icons.Outlined.MenuBook),
