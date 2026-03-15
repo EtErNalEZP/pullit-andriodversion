@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.lazy.grid.*
 import androidx.compose.foundation.shape.CircleShape
@@ -34,6 +36,12 @@ import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.components.MiniToasterView
 import com.example.pullit.data.model.Recipe
 import com.example.pullit.ui.theme.*
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.example.pullit.viewmodel.BackgroundGenerationState
+import com.example.pullit.viewmodel.GenerationTask
+import com.example.pullit.viewmodel.CalorieFilter
+import com.example.pullit.viewmodel.CookTimeFilter
 import com.example.pullit.viewmodel.ImportViewModel
 import com.example.pullit.viewmodel.RecipeListViewModel
 import com.example.pullit.viewmodel.SortOrder
@@ -89,6 +97,12 @@ fun RecipeListScreen(
     val isMultiSelectMode by viewModel.isMultiSelectMode.collectAsState()
     val selectedRecipeIds by viewModel.selectedRecipeIds.collectAsState()
     val displayName by authManager.displayName.collectAsState()
+    val cookTimeFilter by viewModel.cookTimeFilter.collectAsState()
+    val calorieFilter by viewModel.calorieFilter.collectAsState()
+    val selectedTags by viewModel.selectedTags.collectAsState()
+    val showFilterPanel by viewModel.showFilterPanel.collectAsState()
+    val hasActiveFilters by viewModel.hasActiveFilters.collectAsState()
+    val availableTags by viewModel.availableTags.collectAsState()
 
     // Import state
     val isGenerating by importViewModel.isGenerating.collectAsState()
@@ -98,7 +112,6 @@ fun RecipeListScreen(
     val pendingCoverUrl by importViewModel.pendingCoverUrl.collectAsState()
 
     var selectedTab by remember { mutableStateOf(RecipeTab.ALL_RECIPES) }
-    var showSortMenu by remember { mutableStateOf(false) }
     var showCookbookDialog by remember { mutableStateOf(false) }
     var showImportSheet by remember { mutableStateOf(false) }
     var showRecommendationSheet by remember { mutableStateOf(false) }
@@ -251,61 +264,6 @@ fun RecipeListScreen(
                         )
                     }
 
-                    // Sort menu
-                    Box {
-                        IconButton(
-                            onClick = { showSortMenu = true },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(
-                                Icons.Outlined.Sort,
-                                contentDescription = "Sort",
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = showSortMenu,
-                            onDismissRequest = { showSortMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(S.newestFirst) },
-                                onClick = { viewModel.setSortOrder(SortOrder.NEWEST); showSortMenu = false },
-                                leadingIcon = {
-                                    if (sortOrder == SortOrder.NEWEST) Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = Primary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(S.oldestFirst) },
-                                onClick = { viewModel.setSortOrder(SortOrder.OLDEST); showSortMenu = false },
-                                leadingIcon = {
-                                    if (sortOrder == SortOrder.OLDEST) Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = Primary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(S.byName) },
-                                onClick = { viewModel.setSortOrder(SortOrder.NAME); showSortMenu = false },
-                                leadingIcon = {
-                                    if (sortOrder == SortOrder.NAME) Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = Primary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-                            )
-                        }
-                    }
-
                     // Multi-select mode toggle
                     IconButton(
                         onClick = { viewModel.toggleMultiSelectMode() },
@@ -315,6 +273,21 @@ fun RecipeListScreen(
                             imageVector = if (isMultiSelectMode) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
                             contentDescription = "Multi-select",
                             tint = if (isMultiSelectMode) Primary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Combined Sort & Filter toggle button
+                    IconButton(
+                        onClick = { viewModel.toggleFilterPanel() },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (hasActiveFilters || sortOrder != SortOrder.NEWEST)
+                                Icons.Filled.FilterList else Icons.Outlined.FilterList,
+                            contentDescription = "Sort & Filter",
+                            tint = if (hasActiveFilters || sortOrder != SortOrder.NEWEST)
+                                Primary else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -359,6 +332,34 @@ fun RecipeListScreen(
                             }
                             innerTextField()
                         }
+                    )
+                }
+
+                // ── Sort & Filter Panel ──
+                AnimatedVisibility(visible = showFilterPanel) {
+                    FilterPanel(
+                        sortOrder = sortOrder,
+                        cookTimeFilter = cookTimeFilter,
+                        calorieFilter = calorieFilter,
+                        selectedTags = selectedTags,
+                        availableTags = availableTags,
+                        onSortOrderChange = { viewModel.setSortOrder(it) },
+                        onCookTimeFilterChange = { viewModel.setCookTimeFilter(it) },
+                        onCalorieFilterChange = { viewModel.setCalorieFilter(it) },
+                        onTagToggle = { viewModel.toggleTag(it) }
+                    )
+                }
+
+                // ── Active Filter Tags (when panel hidden but filters active) ──
+                if (!showFilterPanel && hasActiveFilters) {
+                    ActiveFilterTagsRow(
+                        cookTimeFilter = cookTimeFilter,
+                        calorieFilter = calorieFilter,
+                        selectedTags = selectedTags,
+                        onClearCookTime = { viewModel.setCookTimeFilter(CookTimeFilter.ANY) },
+                        onClearCalorie = { viewModel.setCalorieFilter(CalorieFilter.ANY) },
+                        onClearTag = { viewModel.toggleTag(it) },
+                        onClearAll = { viewModel.clearFilters() }
                     )
                 }
 
@@ -584,12 +585,17 @@ private fun RecipeGridContent(
 ) {
     val S = LocalStrings.current
 
-    // Determine if we should show the generating card
-    val showGeneratingCard = isGenerating || generatedRecipe != null
+    // Multi-task generation from BackgroundGenerationState
+    val generationTasks by BackgroundGenerationState.tasks.collectAsState()
 
-    // Filter out the generated recipe from normal list to avoid duplicates
-    val displayRecipes = if (showGeneratingCard && generatedRecipe != null) {
-        recipes.filter { it.id != generatedRecipe.id }
+    // Determine if we should show the generating card (legacy single + multi-task)
+    val showGeneratingCard = isGenerating || generatedRecipe != null || generationTasks.isNotEmpty()
+
+    // Filter out generated recipes from normal list to avoid duplicates
+    val generatedRecipeIds = generationTasks.mapNotNull { task -> task.generatedRecipe?.id }.toSet() +
+        listOfNotNull(generatedRecipe?.id)
+    val displayRecipes = if (generatedRecipeIds.isNotEmpty()) {
+        recipes.filter { recipe -> recipe.id !in generatedRecipeIds }
     } else recipes
 
     if (!showGeneratingCard && displayRecipes.isEmpty()) {
@@ -641,8 +647,30 @@ private fun RecipeGridContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
-        // IMPORTANT: If isGenerating is true, show GeneratingRecipeCard as the FIRST item
-        if (showGeneratingCard) {
+        // Show generating cards for all active/completed tasks
+        if (generationTasks.isNotEmpty()) {
+            items(
+                items = generationTasks,
+                key = { task -> "generating_${task.id}" }
+            ) { task ->
+                GeneratingRecipeCard(
+                    isGenerating = !task.isCompleted && !task.isError,
+                    generatedRecipe = task.generatedRecipe,
+                    progress = task.progress,
+                    pendingTitle = task.pendingTitle,
+                    pendingCoverUrl = task.pendingCoverUrl,
+                    onTap = {
+                        if (task.isCompleted) {
+                            task.generatedRecipe?.let { recipe -> onGeneratedRecipeTap(recipe) }
+                            BackgroundGenerationState.remove(task.id)
+                        } else if (task.isError) {
+                            BackgroundGenerationState.remove(task.id)
+                        }
+                    }
+                )
+            }
+        } else if (showGeneratingCard) {
+            // Legacy single-task fallback
             item(key = "generating_card") {
                 GeneratingRecipeCard(
                     isGenerating = isGenerating,
@@ -1131,5 +1159,261 @@ private fun CookbookListContent(
                 }
             }
         )
+    }
+}
+
+// ──────────────────────────────────────────────────────────
+// Filter Panel
+// ──────────────────────────────────────────────────────────
+
+@Composable
+private fun FilterPanel(
+    sortOrder: SortOrder,
+    cookTimeFilter: CookTimeFilter,
+    calorieFilter: CalorieFilter,
+    selectedTags: Set<String>,
+    availableTags: List<String>,
+    onSortOrderChange: (SortOrder) -> Unit,
+    onCookTimeFilterChange: (CookTimeFilter) -> Unit,
+    onCalorieFilterChange: (CalorieFilter) -> Unit,
+    onTagToggle: (String) -> Unit
+) {
+    val S = LocalStrings.current
+    var tagsExpanded by remember { mutableStateOf(false) }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Sort row
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    S.filterSort,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        FilterChipView(
+                            label = S.newestFirst,
+                            isSelected = sortOrder == SortOrder.NEWEST,
+                            onClick = { onSortOrderChange(SortOrder.NEWEST) }
+                        )
+                    }
+                    item {
+                        FilterChipView(
+                            label = S.oldestFirst,
+                            isSelected = sortOrder == SortOrder.OLDEST,
+                            onClick = { onSortOrderChange(SortOrder.OLDEST) }
+                        )
+                    }
+                    item {
+                        FilterChipView(
+                            label = S.byName,
+                            isSelected = sortOrder == SortOrder.NAME,
+                            onClick = { onSortOrderChange(SortOrder.NAME) }
+                        )
+                    }
+                }
+            }
+
+            // Cook time row
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    S.filterCookTime,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(CookTimeFilter.entries.toList()) { filter ->
+                        FilterChipView(
+                            label = filter.label(S),
+                            isSelected = cookTimeFilter == filter,
+                            onClick = { onCookTimeFilterChange(filter) }
+                        )
+                    }
+                }
+            }
+
+            // Calorie row
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    S.filterCalories,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(CalorieFilter.entries.toList()) { filter ->
+                        FilterChipView(
+                            label = filter.label(S),
+                            isSelected = calorieFilter == filter,
+                            onClick = { onCalorieFilterChange(filter) }
+                        )
+                    }
+                }
+            }
+
+            // Tags section (collapsible)
+            if (availableTags.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            S.filterTags,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        IconButton(
+                            onClick = { tagsExpanded = !tagsExpanded },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                if (tagsExpanded) Icons.Default.KeyboardArrowUp
+                                else Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = TextSecondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    @OptIn(ExperimentalLayoutApi::class)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .then(
+                                if (!tagsExpanded) Modifier.heightIn(max = 36.dp)
+                                else Modifier
+                            )
+                            .clipToBounds()
+                    ) {
+                        availableTags.forEach { tag ->
+                            FilterChipView(
+                                label = tag,
+                                isSelected = tag in selectedTags,
+                                onClick = { onTagToggle(tag) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilterChipView(label: String, isSelected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(50),
+        color = if (isSelected) Primary else MaterialTheme.colorScheme.surface,
+        border = if (!isSelected) BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+        ) else null
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+        )
+    }
+}
+
+@Composable
+private fun ActiveFilterTagsRow(
+    cookTimeFilter: CookTimeFilter,
+    calorieFilter: CalorieFilter,
+    selectedTags: Set<String>,
+    onClearCookTime: () -> Unit,
+    onClearCalorie: () -> Unit,
+    onClearTag: (String) -> Unit,
+    onClearAll: () -> Unit
+) {
+    val S = LocalStrings.current
+    val activeCount = (if (cookTimeFilter != CookTimeFilter.ANY) 1 else 0) +
+        (if (calorieFilter != CalorieFilter.ANY) 1 else 0) + selectedTags.size
+
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(vertical = 4.dp)
+    ) {
+        if (activeCount >= 2) {
+            item {
+                Surface(
+                    onClick = onClearAll,
+                    shape = RoundedCornerShape(50),
+                    color = PrimaryDark.copy(alpha = 0.6f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                        Text(S.clearAllFilters, color = Color.White, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+        if (cookTimeFilter != CookTimeFilter.ANY) {
+            item {
+                ActiveFilterTag(
+                    icon = Icons.Outlined.Timer,
+                    label = cookTimeFilter.label(S),
+                    onRemove = onClearCookTime
+                )
+            }
+        }
+        if (calorieFilter != CalorieFilter.ANY) {
+            item {
+                ActiveFilterTag(
+                    icon = Icons.Outlined.LocalFireDepartment,
+                    label = calorieFilter.label(S),
+                    onRemove = onClearCalorie
+                )
+            }
+        }
+        items(selectedTags.sorted().toList()) { tag ->
+            ActiveFilterTag(
+                icon = Icons.Outlined.Label,
+                label = tag,
+                onRemove = { onClearTag(tag) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActiveFilterTag(icon: ImageVector, label: String, onRemove: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = Primary.copy(alpha = 0.1f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = PrimaryDark, modifier = Modifier.size(12.dp))
+            Text(label, color = PrimaryDark, style = MaterialTheme.typography.labelSmall)
+            Icon(
+                Icons.Default.Close,
+                contentDescription = "Remove",
+                tint = PrimaryDark,
+                modifier = Modifier
+                    .size(12.dp)
+                    .clickable { onRemove() }
+            )
+        }
     }
 }
