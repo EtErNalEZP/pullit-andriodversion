@@ -1,5 +1,7 @@
 package com.example.pullit.auth
 
+import com.example.pullit.data.local.AppDatabase
+import com.example.pullit.service.ApiClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.postgrest
@@ -49,7 +51,8 @@ class AuthManager {
         _isLoading.value = false
     }
 
-    suspend fun signUp(email: String, password: String) {
+    /** @return true if email confirmation is required (user not auto-signed-in) */
+    suspend fun signUp(email: String, password: String): Boolean {
         supabase.auth.signUpWith(Email) {
             this.email = email
             this.password = password
@@ -61,7 +64,9 @@ class AuthManager {
             _userEmail.value = session.user?.email
             _isAuthenticated.value = true
             fetchProfile()
+            return false
         }
+        return true // email confirmation required
     }
 
     suspend fun signIn(email: String, password: String) {
@@ -88,6 +93,19 @@ class AuthManager {
 
         _displayName.value = trimmed
         _needsDisplayName.value = false
+    }
+
+    suspend fun resetPassword(email: String) {
+        supabase.auth.resetPasswordForEmail(email)
+    }
+
+    suspend fun deleteAccount(db: AppDatabase) {
+        val uid = _userId.value ?: return
+        try {
+            ApiClient.delete("/api/account/$uid")
+        } catch (_: Exception) { /* proceed even if server delete fails */ }
+        db.clearAllTables()
+        signOut()
     }
 
     suspend fun signOut() {

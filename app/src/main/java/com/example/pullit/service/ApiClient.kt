@@ -75,6 +75,27 @@ object ApiClient {
         }
     }
 
+    suspend fun delete(path: String) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val url = URL("$BASE_URL$path")
+            val conn = url.openConnection() as HttpURLConnection
+            try {
+                conn.requestMethod = "DELETE"
+                conn.setRequestProperty("X-API-Key", API_KEY)
+                conn.connectTimeout = 30000
+                conn.readTimeout = 30000
+                val code = conn.responseCode
+                if (code !in 200..299) {
+                    val errorBody = try { conn.errorStream?.bufferedReader()?.readText() } catch (_: Exception) { null }
+                    throw ApiError.HttpError(code, errorBody)
+                }
+            } catch (e: ApiError) { throw e }
+            catch (e: IOException) { throw ApiError.NetworkError(e) }
+            catch (e: Exception) { throw ApiError.Unknown(e.message ?: "Unknown error") }
+            finally { conn.disconnect() }
+        }
+    }
+
     fun postRaw(path: String, body: String?): ByteArray {
         val url = URL("$BASE_URL$path")
         val conn = url.openConnection() as HttpURLConnection
