@@ -33,6 +33,11 @@ class AppSettings private constructor(private val prefs: SharedPreferences) {
     )
     val autoDetectClipboard: StateFlow<Boolean> = _autoDetectClipboard.asStateFlow()
 
+    private val _autoCookbookRecommend = MutableStateFlow(
+        prefs.getBoolean("autoCookbookRecommend", true)
+    )
+    val autoCookbookRecommend: StateFlow<Boolean> = _autoCookbookRecommend.asStateFlow()
+
     fun setAppearance(value: AppAppearance) {
         prefs.edit().putString("appAppearance", value.key).apply()
         _appearance.value = value
@@ -46,6 +51,11 @@ class AppSettings private constructor(private val prefs: SharedPreferences) {
     fun setAutoDetectClipboard(value: Boolean) {
         prefs.edit().putBoolean("autoDetectClipboard", value).apply()
         _autoDetectClipboard.value = value
+    }
+
+    fun setAutoCookbookRecommend(value: Boolean) {
+        prefs.edit().putBoolean("autoCookbookRecommend", value).apply()
+        _autoCookbookRecommend.value = value
     }
 
     companion object {

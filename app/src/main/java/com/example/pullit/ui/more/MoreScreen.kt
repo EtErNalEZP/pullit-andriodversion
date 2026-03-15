@@ -32,6 +32,7 @@ import com.example.pullit.auth.AuthManager
 import com.example.pullit.data.AppAppearance
 import com.example.pullit.data.AppLanguage
 import com.example.pullit.data.AppSettings
+import com.example.pullit.data.local.AppDatabase
 import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.navigation.Screen
 import com.example.pullit.ui.theme.*
@@ -57,11 +58,14 @@ fun MoreScreen(
     val appearance by settings.appearance.collectAsState()
     val language by settings.language.collectAsState()
     val autoDetectClipboard by settings.autoDetectClipboard.collectAsState()
+    val autoCookbookRecommend by settings.autoCookbookRecommend.collectAsState()
 
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showAppearanceDialog by remember { mutableStateOf(false) }
     var showDisplayNameDialog by remember { mutableStateOf(false) }
+    var showDeleteAccountDialog by remember { mutableStateOf(false) }
+    var isDeletingAccount by remember { mutableStateOf(false) }
 
     val recipeCount = recipes.size
     val cookbookCount = cookbooks.size
@@ -84,6 +88,40 @@ fun MoreScreen(
                 TextButton(onClick = { showSignOutDialog = false }) {
                     Text(S.cancel, color = TextSecondary)
                 }
+            }
+        )
+    }
+
+    if (showDeleteAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isDeletingAccount) showDeleteAccountDialog = false },
+            title = { Text(S.deleteAccountConfirmTitle, fontWeight = FontWeight.Bold) },
+            text = { Text(S.deleteAccountConfirmMessage) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        isDeletingAccount = true
+                        scope.launch {
+                            val db = AppDatabase.getInstance(context)
+                            try { authManager.deleteAccount(db) } catch (_: Exception) {}
+                            isDeletingAccount = false
+                            showDeleteAccountDialog = false
+                        }
+                    },
+                    enabled = !isDeletingAccount
+                ) {
+                    if (isDeletingAccount) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(S.deleteAccount, color = Error, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteAccountDialog = false },
+                    enabled = !isDeletingAccount
+                ) { Text(S.cancel, color = TextSecondary) }
             }
         )
     }
@@ -335,6 +373,21 @@ fun MoreScreen(
                                 )
                             }
                         )
+                        SettingsDivider()
+                        SettingsRow(
+                            icon = Icons.Outlined.AutoAwesome,
+                            title = S.autoCookbookRecommend,
+                            onClick = { settings.setAutoCookbookRecommend(!autoCookbookRecommend) },
+                            showChevron = false,
+                            trailing = {
+                                Switch(
+                                    checked = autoCookbookRecommend,
+                                    onCheckedChange = { settings.setAutoCookbookRecommend(it) },
+                                    colors = SwitchDefaults.colors(checkedTrackColor = Primary),
+                                    modifier = Modifier.height(24.dp)
+                                )
+                            }
+                        )
                     }
                 }
             }
@@ -470,6 +523,15 @@ fun MoreScreen(
                             icon = Icons.AutoMirrored.Outlined.Logout,
                             title = S.signOut,
                             onClick = { showSignOutDialog = true },
+                            titleColor = Error,
+                            iconTint = Error,
+                            showChevron = false
+                        )
+                        SettingsDivider()
+                        SettingsRow(
+                            icon = Icons.Outlined.Delete,
+                            title = S.deleteAccount,
+                            onClick = { showDeleteAccountDialog = true },
                             titleColor = Error,
                             iconTint = Error,
                             showChevron = false
