@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.pullit.data.AppSettings
 import com.example.pullit.data.local.AppDatabase
 import com.example.pullit.data.model.*
 import com.example.pullit.service.*
@@ -59,13 +60,16 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
             lower.contains("tiktok") -> "tiktok"
             lower.contains("instagram") -> "instagram"
             lower.contains("youtube") || lower.contains("youtu.be") -> "youtube"
+            lower.contains("pinterest") || lower.contains("pin.it") -> "pinterest"
             else -> "unknown"
         }
     }
 
     fun importFromLink() = viewModelScope.launch {
         val text = _inputText.value.trim()
-        if (text.isBlank()) return@launch
+        if (text.isBlank() || !BackgroundGenerationState.canStartNew) return@launch
+
+        val taskId = BackgroundGenerationState.start()
 
         _isGenerating.value = true
         _error.value = null
@@ -73,35 +77,44 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
 
         try {
             val platform = detectPlatform(text)
-            Log.d("ImportVM", "Importing from platform=$platform, text=$text")
+            Log.d("ImportVM", "Importing from platform=$platform, text=$text, taskId=$taskId")
 
             when (platform) {
-                "xiachufang" -> importFromXiachufang(text)
-                "xiaohongshu" -> importFromXiaohongshu(text)
-                else -> importFromVideo(text)
+                "xiachufang" -> importFromXiachufang(text, taskId)
+                "xiaohongshu" -> importFromXiaohongshu(text, taskId)
+                else -> importFromVideo(text, taskId)
+            }
+
+            _generatedRecipe.value?.let { recipe ->
+                val settings = AppSettings.getInstance(getApplication())
+                val autoRecommend = settings.autoCookbookRecommend.value
+                BackgroundGenerationState.complete(taskId, recipe, autoRecommend)
             }
             Log.d("ImportVM", "Import success: ${_generatedRecipe.value?.title}")
         } catch (e: Exception) {
             Log.e("ImportVM", "Import failed", e)
-            _error.value = when (e) {
+            val errorMsg = when (e) {
                 is ApiError.HttpError -> "HTTP ${e.code}: ${e.msg}"
                 is ApiError.NetworkError -> "Network error: ${e.cause?.message}"
                 is ApiError.DecodingError -> "Decode error: ${e.cause?.message}"
                 is ApiError.Timeout -> "Request timed out"
                 else -> "${e::class.simpleName}: ${e.message}"
             }
+            _error.value = errorMsg
+            BackgroundGenerationState.fail(taskId, errorMsg ?: "Unknown error")
         } finally {
             _isGenerating.value = false
         }
     }
 
-    private suspend fun importFromXiachufang(text: String) {
+    private suspend fun importFromXiachufang(text: String, taskId: String) {
         val url = XiachufangService.extractUrl(text) ?: text
         val result = XiachufangService.parseUrl(url)
 
         // Set pending preview info for the loading card
         _pendingTitle.value = result.title.takeIf { it.isNotBlank() }
         _pendingCoverUrl.value = result.imageUrl
+        BackgroundGenerationState.updatePendingInfo(taskId, result.title.takeIf { it.isNotBlank() }, result.imageUrl)
 
         val ingredientsJson = json.encodeToString(
             kotlinx.serialization.builtins.ListSerializer(Ingredient.serializer()), result.ingredients
@@ -125,12 +138,13 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
         _generatedRecipe.value = recipe
     }
 
-    private suspend fun importFromXiaohongshu(text: String) {
+    private suspend fun importFromXiaohongshu(text: String, taskId: String) {
         val content = XiaohongshuService.fetchContent(text)
 
         // Set pending preview info for the loading card
         _pendingTitle.value = content.title.takeIf { it.isNotBlank() }
         _pendingCoverUrl.value = content.coverUrl
+        BackgroundGenerationState.updatePendingInfo(taskId, content.title.takeIf { it.isNotBlank() }, content.coverUrl)
 
         if (content.useBackendDirectly || content.videoUrl != null) {
             val recipe = RecipeGenerationService.generateRecipe(
@@ -140,7 +154,10 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
                 extractedTitle = content.title.takeIf { it.isNotBlank() },
                 extractedDescription = content.description.takeIf { it.isNotBlank() },
                 extractedCoverUrl = content.coverUrl,
-                onProgress = { _progress.value = it }
+                onProgress = { progress ->
+                    _progress.value = progress
+                    BackgroundGenerationState.updateProgress(taskId, progress)
+                }
             )
             recipeDao.upsert(recipe)
             _generatedRecipe.value = recipe
@@ -152,20 +169,26 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
                 extractedTitle = content.title.takeIf { it.isNotBlank() },
                 extractedDescription = content.description.takeIf { it.isNotBlank() },
                 extractedCoverUrl = content.coverUrl,
-                onProgress = { _progress.value = it }
+                onProgress = { progress ->
+                    _progress.value = progress
+                    BackgroundGenerationState.updateProgress(taskId, progress)
+                }
             )
             recipeDao.upsert(recipe)
             _generatedRecipe.value = recipe
         }
     }
 
-    private suspend fun importFromVideo(text: String) {
+    private suspend fun importFromVideo(text: String, taskId: String) {
         val urlRegex = Regex("https?://[^\\s]+")
         val url = urlRegex.find(text)?.value ?: text
 
         val recipe = RecipeGenerationService.generateRecipe(
             videoUrl = url,
-            onProgress = { _progress.value = it }
+            onProgress = { progress ->
+                _progress.value = progress
+                BackgroundGenerationState.updateProgress(taskId, progress)
+            }
         )
         recipeDao.upsert(recipe)
         _generatedRecipe.value = recipe

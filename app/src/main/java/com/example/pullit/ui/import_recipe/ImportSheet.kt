@@ -104,8 +104,10 @@ fun ImportSheet(
                 PlatformIcon(R.drawable.ic_platform_douyin, S.douyin),
                 PlatformIcon(R.drawable.ic_platform_bilibili, "Bilibili"),
                 PlatformIcon(R.drawable.ic_platform_xiachufang, S.xiachufang),
+                PlatformIcon(R.drawable.ic_platform_tiktok, "TikTok"),
                 PlatformIcon(R.drawable.ic_platform_instagram, "Instagram"),
-                PlatformIcon(R.drawable.ic_platform_youtube, "YouTube")
+                PlatformIcon(R.drawable.ic_platform_youtube, "YouTube"),
+                PlatformIcon(R.drawable.ic_platform_pinterest, S.pinterest)
             )
 
             platforms.forEach { platform ->
@@ -694,5 +696,6 @@ private fun platformDisplayName(platform: String): String = when (platform) {
     "tiktok" -> "TikTok"
     "instagram" -> "Instagram"
     "youtube" -> "YouTube"
+    "pinterest" -> "Pinterest"
     else -> platform
 }
