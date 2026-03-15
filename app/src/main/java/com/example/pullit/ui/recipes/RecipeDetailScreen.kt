@@ -506,25 +506,25 @@ fun RecipeDetailScreen(
                         ) {
                             NutritionInfoItem(
                                 icon = Icons.Outlined.LocalFireDepartment,
-                                value = nutrition.calories.ifBlank { "--" },
+                                value = scaleNutritionValue(nutrition.calories.ifBlank { "--" }, servingRatio),
                                 label = "Calories",
                                 iconTint = Error
                             )
                             NutritionInfoItem(
                                 icon = Icons.Outlined.FitnessCenter,
-                                value = nutrition.protein.ifBlank { "--" },
+                                value = scaleNutritionValue(nutrition.protein.ifBlank { "--" }, servingRatio),
                                 label = "Protein",
                                 iconTint = Info
                             )
                             NutritionInfoItem(
                                 icon = Icons.Outlined.WaterDrop,
-                                value = nutrition.fat.ifBlank { "--" },
+                                value = scaleNutritionValue(nutrition.fat.ifBlank { "--" }, servingRatio),
                                 label = "Fat",
                                 iconTint = Warning
                             )
                             NutritionInfoItem(
                                 icon = Icons.Outlined.Grass,
-                                value = nutrition.carbs.ifBlank { "--" },
+                                value = scaleNutritionValue(nutrition.carbs.ifBlank { "--" }, servingRatio),
                                 label = "Carbs",
                                 iconTint = Success
                             )
@@ -973,6 +973,20 @@ private fun scaleAmount(amount: String, ratio: Float): String {
         "%.1f".format(scaled)
     }
     return "$formatted$suffix"
+}
+
+/**
+ * Scales a nutrition value string (e.g., "730 kcal", "35g") by the serving ratio.
+ */
+private fun scaleNutritionValue(value: String, ratio: Float): String {
+    if (ratio == 1f || value.isBlank() || value == "--") return value
+    val regex = Regex("""^(\d+\.?\d*)\s*(.*)""")
+    val match = regex.find(value.trim()) ?: return value
+    val number = match.groupValues[1].toDoubleOrNull() ?: return value
+    val suffix = match.groupValues[2]
+    val scaled = (number * ratio).let { if (it >= 1) kotlin.math.round(it).toLong() else it }
+    val formatted = if (scaled is Long) scaled.toString() else "%.1f".format(scaled)
+    return if (suffix.isNotEmpty()) "$formatted $suffix".trim() else formatted
 }
 
 /**
