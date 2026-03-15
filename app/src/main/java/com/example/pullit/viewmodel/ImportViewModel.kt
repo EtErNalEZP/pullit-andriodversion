@@ -8,9 +8,7 @@ import com.example.pullit.data.AppSettings
 import com.example.pullit.data.local.AppDatabase
 import com.example.pullit.data.model.*
 import com.example.pullit.service.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import java.util.UUID
@@ -28,8 +26,9 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
     private val _importMethod = MutableStateFlow(ImportMethod.LINK)
     val importMethod: StateFlow<ImportMethod> = _importMethod.asStateFlow()
 
-    private val _isGenerating = MutableStateFlow(false)
-    val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
+    val isGenerating: StateFlow<Boolean> = BackgroundGenerationState.tasks
+        .map { tasks -> tasks.any { !it.isCompleted && !it.isError } }
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
 
     private val _progress = MutableStateFlow<RecipeGenerationProgress?>(null)
     val progress: StateFlow<RecipeGenerationProgress?> = _progress.asStateFlow()
@@ -70,10 +69,7 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
         if (text.isBlank() || !BackgroundGenerationState.canStartNew) return@launch
 
         val taskId = BackgroundGenerationState.start()
-
-        _isGenerating.value = true
         _error.value = null
-        _generatedRecipe.value = null
 
         try {
             val platform = detectPlatform(text)
@@ -102,8 +98,6 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
             }
             _error.value = errorMsg
             BackgroundGenerationState.fail(taskId, errorMsg ?: "Unknown error")
-        } finally {
-            _isGenerating.value = false
         }
     }
 
@@ -195,8 +189,8 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun importFromText(text: String) = viewModelScope.launch {
-        if (text.isBlank()) return@launch
-        _isGenerating.value = true
+        if (text.isBlank() || !BackgroundGenerationState.canStartNew) return@launch
+        val taskId = BackgroundGenerationState.start()
         _error.value = null
 
         try {
@@ -204,15 +198,17 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
             val recipe = TextParserService.convertToRecipe(parsed)
             recipeDao.upsert(recipe)
             _generatedRecipe.value = recipe
+            val settings = AppSettings.getInstance(getApplication())
+            BackgroundGenerationState.complete(taskId, recipe, settings.autoCookbookRecommend.value)
         } catch (e: Exception) {
             _error.value = e.message ?: "Parse failed"
-        } finally {
-            _isGenerating.value = false
+            BackgroundGenerationState.fail(taskId, e.message ?: "Parse failed")
         }
     }
 
     fun importFromImage(imageData: ByteArray) = viewModelScope.launch {
-        _isGenerating.value = true
+        if (!BackgroundGenerationState.canStartNew) return@launch
+        val taskId = BackgroundGenerationState.start()
         _error.value = null
 
         try {
@@ -220,16 +216,16 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
             val recipe = TextParserService.convertToRecipe(parsed)
             recipeDao.upsert(recipe)
             _generatedRecipe.value = recipe
+            val settings = AppSettings.getInstance(getApplication())
+            BackgroundGenerationState.complete(taskId, recipe, settings.autoCookbookRecommend.value)
         } catch (e: Exception) {
             _error.value = e.message ?: "Image import failed"
-        } finally {
-            _isGenerating.value = false
+            BackgroundGenerationState.fail(taskId, e.message ?: "Image import failed")
         }
     }
 
     fun reset() {
         _inputText.value = ""
-        _isGenerating.value = false
         _progress.value = null
         _error.value = null
         _generatedRecipe.value = null

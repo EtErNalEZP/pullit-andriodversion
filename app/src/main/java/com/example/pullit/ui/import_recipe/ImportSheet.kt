@@ -47,6 +47,7 @@ fun ImportSheet(
     val inputText by importViewModel.inputText.collectAsState()
     val importMethod by importViewModel.importMethod.collectAsState()
     val isGenerating by importViewModel.isGenerating.collectAsState()
+    val canStartNew = !isGenerating || com.example.pullit.viewmodel.BackgroundGenerationState.canStartNew
     val error by importViewModel.error.collectAsState()
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
@@ -160,6 +161,7 @@ fun ImportSheet(
                 inputText = inputText,
                 detectedPlatform = detectedPlatform,
                 isGenerating = isGenerating,
+                canStartNew = canStartNew,
                 onInputChange = { importViewModel.setInputText(it) },
                 onPaste = {
                     clipboardManager.getText()?.text?.let { importViewModel.setInputText(it) }
@@ -180,6 +182,7 @@ fun ImportSheet(
             ImportMethod.TEXT -> TextTab(
                 inputText = inputText,
                 isGenerating = isGenerating,
+                canStartNew = canStartNew,
                 onInputChange = { importViewModel.setInputText(it) },
                 onImport = {
                     onStartGenerating()
@@ -190,6 +193,7 @@ fun ImportSheet(
             ImportMethod.IMAGE -> ImageTab(
                 selectedImageUri = selectedImageUri,
                 isGenerating = isGenerating,
+                canStartNew = canStartNew,
                 onPickImage = { imagePicker.launch("image/*") },
                 onImport = {
                     selectedImageBytes?.let {
@@ -295,6 +299,7 @@ private fun LinkTab(
     inputText: String,
     detectedPlatform: String,
     isGenerating: Boolean,
+    canStartNew: Boolean,
     onInputChange: (String) -> Unit,
     onPaste: () -> Unit,
     onClear: () -> Unit,
@@ -419,7 +424,7 @@ private fun LinkTab(
         modifier = Modifier
             .fillMaxWidth()
             .height(50.dp),
-        enabled = detectedPlatform != "unknown" && inputText.isNotBlank() && !isGenerating,
+        enabled = detectedPlatform != "unknown" && inputText.isNotBlank() && canStartNew,
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = Primary,
@@ -508,6 +513,7 @@ private fun LinkTab(
 private fun TextTab(
     inputText: String,
     isGenerating: Boolean,
+    canStartNew: Boolean,
     onInputChange: (String) -> Unit,
     onImport: () -> Unit
 ) {
@@ -558,7 +564,7 @@ private fun TextTab(
         modifier = Modifier
             .fillMaxWidth()
             .height(50.dp),
-        enabled = inputText.isNotBlank() && !isGenerating,
+        enabled = inputText.isNotBlank() && canStartNew,
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = Primary,
@@ -588,6 +594,7 @@ private fun TextTab(
 private fun ImageTab(
     selectedImageUri: Uri?,
     isGenerating: Boolean,
+    canStartNew: Boolean,
     onPickImage: () -> Unit,
     onImport: () -> Unit
 ) {
@@ -639,7 +646,7 @@ private fun ImageTab(
         modifier = Modifier
             .fillMaxWidth()
             .height(50.dp),
-        enabled = selectedImageUri != null && !isGenerating,
+        enabled = selectedImageUri != null && canStartNew,
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = Primary,

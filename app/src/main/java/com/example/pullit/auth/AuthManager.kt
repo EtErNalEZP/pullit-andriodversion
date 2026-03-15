@@ -104,7 +104,9 @@ class AuthManager {
         try {
             ApiClient.delete("/api/account/$uid")
         } catch (_: Exception) { /* proceed even if server delete fails */ }
-        db.clearAllTables()
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            db.clearAllTables()
+        }
         signOut()
     }
 

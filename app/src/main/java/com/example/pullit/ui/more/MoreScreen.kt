@@ -103,7 +103,11 @@ fun MoreScreen(
                         isDeletingAccount = true
                         scope.launch {
                             val db = AppDatabase.getInstance(context)
-                            try { authManager.deleteAccount(db) } catch (_: Exception) {}
+                            try {
+                                authManager.deleteAccount(db)
+                            } catch (e: Exception) {
+                                android.util.Log.e("MoreScreen", "Delete account failed", e)
+                            }
                             isDeletingAccount = false
                             showDeleteAccountDialog = false
                         }

@@ -114,30 +114,54 @@ fun RecipeListScreen(
     var selectedTab by remember { mutableStateOf(RecipeTab.ALL_RECIPES) }
     var showCookbookDialog by remember { mutableStateOf(false) }
     var showImportSheet by remember { mutableStateOf(false) }
-    var showRecommendationSheet by remember { mutableStateOf(false) }
-    var recommendationRecipe by remember { mutableStateOf<Recipe?>(null) }
+    var recommendationQueue by remember { mutableStateOf(listOf<Recipe>()) }
+    val currentRecommendation = recommendationQueue.firstOrNull()
 
-    // Auto-show cookbook recommendation when generation completes with labels
+    // Auto-queue cookbook recommendation when generation completes with labels
+    val generationTasks by BackgroundGenerationState.tasks.collectAsState()
+    val completedRecipes = remember(generationTasks) {
+        generationTasks.filter { it.isCompleted }.mapNotNull { it.generatedRecipe }
+    }
+    var seenRecipeIds by remember { mutableStateOf(setOf<String>()) }
+
+    LaunchedEffect(completedRecipes) {
+        for (recipe in completedRecipes) {
+            if (recipe.id in seenRecipeIds) continue
+            seenRecipeIds = seenRecipeIds + recipe.id
+            val labels = recipe.labelsJson?.let {
+                runCatching {
+                    kotlinx.serialization.json.Json.decodeFromString<com.example.pullit.data.model.RecipeLabels>(it)
+                }.getOrNull()
+            }
+            if (labels != null && !labels.isEmpty) {
+                recommendationQueue = recommendationQueue + recipe
+            }
+        }
+    }
+
+    // Also handle legacy single-task path
     LaunchedEffect(generatedRecipe, isGenerating) {
-        if (!isGenerating && generatedRecipe != null) {
+        if (!isGenerating && generatedRecipe != null && generatedRecipe!!.id !in seenRecipeIds) {
+            seenRecipeIds = seenRecipeIds + generatedRecipe!!.id
             val labels = generatedRecipe!!.labelsJson?.let {
                 runCatching {
                     kotlinx.serialization.json.Json.decodeFromString<com.example.pullit.data.model.RecipeLabels>(it)
                 }.getOrNull()
             }
             if (labels != null && !labels.isEmpty) {
-                recommendationRecipe = generatedRecipe
-                showRecommendationSheet = true
+                recommendationQueue = recommendationQueue + generatedRecipe!!
             }
         }
     }
 
-    // Cookbook recommendation sheet
-    if (showRecommendationSheet && recommendationRecipe != null) {
+    // Cookbook recommendation sheet - shows first in queue, on dismiss shows next
+    if (currentRecommendation != null) {
         CookbookRecommendationSheet(
-            recipe = recommendationRecipe!!,
+            recipe = currentRecommendation,
             viewModel = viewModel,
-            onDismiss = { showRecommendationSheet = false }
+            onDismiss = {
+                recommendationQueue = recommendationQueue.drop(1)
+            }
         )
     }
 
