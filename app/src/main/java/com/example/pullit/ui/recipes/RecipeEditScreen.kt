@@ -1,7 +1,12 @@
 package com.example.pullit.ui.recipes
 
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -18,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,6 +36,8 @@ import com.example.pullit.data.model.Step
 import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.RecipeDetailViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 
@@ -41,11 +49,31 @@ fun RecipeEditScreen(
     viewModel: RecipeDetailViewModel = viewModel()
 ) {
     val S = LocalStrings.current
+    val context = LocalContext.current
     val recipe by viewModel.recipe.collectAsState()
     val json = remember { Json { ignoreUnknownKeys = true } }
 
     LaunchedEffect(recipeId) { viewModel.loadRecipe(recipeId) }
-    val r = recipe ?: return
+    val r = recipe ?: run {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {},
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                )
+            }
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Primary)
+            }
+        }
+        return
+    }
 
     var title by remember(r) { mutableStateOf(r.title) }
     var desc by remember(r) { mutableStateOf(r.desc ?: "") }
@@ -76,6 +104,38 @@ fun RecipeEditScreen(
     var fat by remember(r) { mutableStateOf(nutrition?.fat ?: "") }
     var carbs by remember(r) { mutableStateOf(nutrition?.carbs ?: "") }
     var nutritionExpanded by remember { mutableStateOf(nutrition != null) }
+
+    val editScope = rememberCoroutineScope()
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { selectedUri ->
+            editScope.launch {
+                val saved = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    copyImageToInternal(context, selectedUri)
+                } ?: selectedUri.toString()
+                imageUrl = saved
+            }
+        }
+    }
+
+    var stepImagePickerIndex by remember { mutableIntStateOf(-1) }
+    val stepImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { selectedUri ->
+            val idx = stepImagePickerIndex
+            if (idx in steps.indices) {
+                val step = steps[idx]
+                if (step.imageUrls.size < 4) {
+                    editScope.launch {
+                        val saved = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            copyImageToInternal(context, selectedUri)
+                        } ?: selectedUri.toString()
+                        steps = steps.toMutableList().also { list ->
+                            list[idx] = step.copy(imageUrls = step.imageUrls + saved)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Track which ingredient sections are expanded
     var expandedIngredientSections by remember { mutableStateOf(setOf<Int>()) }
@@ -125,8 +185,10 @@ fun RecipeEditScreen(
                                     json.encodeToString(Nutrition.serializer(), it)
                                 }
                             )
-                            viewModel.updateRecipe(updated)
-                            navController.popBackStack()
+                            editScope.launch {
+                                viewModel.updateRecipe(updated).join()
+                                navController.popBackStack()
+                            }
                         }
                     ) {
                         Text(
@@ -182,7 +244,7 @@ fun RecipeEditScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 SmallFloatingActionButton(
-                                    onClick = { /* Change image - future implementation */ },
+                                    onClick = { imagePicker.launch("image/*") },
                                     containerColor = Color.White.copy(alpha = 0.9f),
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
@@ -212,7 +274,8 @@ fun RecipeEditScreen(
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(120.dp),
+                                .height(120.dp)
+                                .clickable { imagePicker.launch("image/*") },
                             shape = RoundedCornerShape(14.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
@@ -682,6 +745,46 @@ fun RecipeEditScreen(
                         }
                     }
 
+                    // Step images
+                    if (step.imageUrls.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        StepImageGrid(
+                            imageUrls = step.imageUrls,
+                            onRemove = { imgIndex ->
+                                steps = steps.toMutableList().also { list ->
+                                    list[index] = step.copy(
+                                        imageUrls = step.imageUrls.toMutableList().also { it.removeAt(imgIndex) }
+                                    )
+                                }
+                            }
+                        )
+                    }
+
+                    // Add image button
+                    if (step.imageUrls.size < 4) {
+                        TextButton(
+                            onClick = {
+                                stepImagePickerIndex = index
+                                stepImagePicker.launch("image/*")
+                            },
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.AddPhotoAlternate,
+                                contentDescription = null,
+                                tint = TextTertiary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                "${step.imageUrls.size}/4",
+                                fontSize = 12.sp,
+                                color = TextTertiary
+                            )
+                        }
+                    }
+
                     if (index < steps.size - 1) {
                         HorizontalDivider(
                             modifier = Modifier.padding(top = 8.dp),
@@ -742,4 +845,93 @@ private fun editFieldColors(): TextFieldColors {
         unfocusedLabelColor = TextSecondary,
         cursorColor = Primary
     )
+}
+
+/**
+ * Image grid for step images in edit mode (with remove buttons).
+ * Layout: 1→full width, 2→side by side, 3→top full + 2 bottom, 4→2×2 grid
+ */
+@Composable
+private fun StepImageGrid(
+    imageUrls: List<String>,
+    onRemove: (Int) -> Unit
+) {
+    val shape = RoundedCornerShape(10.dp)
+    when (imageUrls.size) {
+        1 -> {
+            StepEditImage(imageUrls[0], shape, Modifier.fillMaxWidth().height(140.dp)) { onRemove(0) }
+        }
+        2 -> {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                StepEditImage(imageUrls[0], shape, Modifier.weight(1f).height(120.dp)) { onRemove(0) }
+                StepEditImage(imageUrls[1], shape, Modifier.weight(1f).height(120.dp)) { onRemove(1) }
+            }
+        }
+        3 -> {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                StepEditImage(imageUrls[0], shape, Modifier.fillMaxWidth().height(120.dp)) { onRemove(0) }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    StepEditImage(imageUrls[1], shape, Modifier.weight(1f).height(100.dp)) { onRemove(1) }
+                    StepEditImage(imageUrls[2], shape, Modifier.weight(1f).height(100.dp)) { onRemove(2) }
+                }
+            }
+        }
+        4 -> {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    StepEditImage(imageUrls[0], shape, Modifier.weight(1f).height(100.dp)) { onRemove(0) }
+                    StepEditImage(imageUrls[1], shape, Modifier.weight(1f).height(100.dp)) { onRemove(1) }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    StepEditImage(imageUrls[2], shape, Modifier.weight(1f).height(100.dp)) { onRemove(2) }
+                    StepEditImage(imageUrls[3], shape, Modifier.weight(1f).height(100.dp)) { onRemove(3) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StepEditImage(
+    url: String,
+    shape: RoundedCornerShape,
+    modifier: Modifier,
+    onRemove: () -> Unit
+) {
+    Box(modifier = modifier.clip(shape)) {
+        AsyncImage(
+            model = url,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        SmallFloatingActionButton(
+            onClick = onRemove,
+            containerColor = Error.copy(alpha = 0.85f),
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .size(24.dp)
+        ) {
+            Icon(
+                Icons.Outlined.Close,
+                contentDescription = "Remove",
+                tint = Color.White,
+                modifier = Modifier.size(14.dp)
+            )
+        }
+    }
+}
+
+/** Copy a content:// URI image to app internal storage so it persists across restarts. */
+private fun copyImageToInternal(context: Context, uri: Uri): String? {
+    return runCatching {
+        val dir = java.io.File(context.filesDir, "images").also { it.mkdirs() }
+        val file = java.io.File(dir, "img_${System.currentTimeMillis()}.jpg")
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            file.outputStream().use { output -> input.copyTo(output) }
+        }
+        file.absolutePath
+    }.getOrNull()
 }

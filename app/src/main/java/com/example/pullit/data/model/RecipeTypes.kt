@@ -12,7 +12,8 @@ data class Ingredient(
 @Serializable
 data class Step(
     val order: Int,
-    val instruction: String
+    val instruction: String,
+    val imageUrls: List<String> = emptyList()
 )
 
 @Serializable

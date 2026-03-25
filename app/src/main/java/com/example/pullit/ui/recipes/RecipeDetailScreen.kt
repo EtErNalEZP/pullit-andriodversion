@@ -69,7 +69,26 @@ fun RecipeDetailScreen(
 
     LaunchedEffect(recipeId) { viewModel.loadRecipe(recipeId) }
 
-    val r = recipe ?: return
+    val r = recipe ?: run {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {},
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
+                )
+            }
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Primary)
+            }
+        }
+        return
+    }
 
     val ingredients = remember(r.ingredientsJson) {
         r.ingredientsJson?.let {
@@ -133,8 +152,10 @@ fun RecipeDetailScreen(
             text = { Text(S.cannotUndo) },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.deleteRecipe()
-                    navController.popBackStack()
+                    scope.launch {
+                        viewModel.deleteRecipe().join()
+                        navController.popBackStack()
+                    }
                 }) {
                     Text(S.delete, color = MaterialTheme.colorScheme.error)
                 }
@@ -226,7 +247,7 @@ fun RecipeDetailScreen(
                 Surface(
                     onClick = {
                         showShareSheet = false
-                        shareAsText(context, r, ingredients, steps)
+                        shareAsText(context, r, ingredients, steps, S)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -507,25 +528,25 @@ fun RecipeDetailScreen(
                             NutritionInfoItem(
                                 icon = Icons.Outlined.LocalFireDepartment,
                                 value = scaleNutritionValue(nutrition.calories.ifBlank { "--" }, servingRatio),
-                                label = "Calories",
+                                label = S.calories,
                                 iconTint = Error
                             )
                             NutritionInfoItem(
                                 icon = Icons.Outlined.FitnessCenter,
                                 value = scaleNutritionValue(nutrition.protein.ifBlank { "--" }, servingRatio),
-                                label = "Protein",
+                                label = S.protein,
                                 iconTint = Info
                             )
                             NutritionInfoItem(
                                 icon = Icons.Outlined.WaterDrop,
                                 value = scaleNutritionValue(nutrition.fat.ifBlank { "--" }, servingRatio),
-                                label = "Fat",
+                                label = S.fat,
                                 iconTint = Warning
                             )
                             NutritionInfoItem(
                                 icon = Icons.Outlined.Grass,
                                 value = scaleNutritionValue(nutrition.carbs.ifBlank { "--" }, servingRatio),
-                                label = "Carbs",
+                                label = S.carbs,
                                 iconTint = Success
                             )
                         }
@@ -886,6 +907,10 @@ fun RecipeDetailScreen(
                                 lineHeight = 22.sp,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
+                            if (step.imageUrls.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                StepImageDisplayGrid(step.imageUrls)
+                            }
                         }
                     }
                 }
@@ -1066,25 +1091,26 @@ private fun shareAsText(
     context: android.content.Context,
     recipe: com.example.pullit.data.model.Recipe,
     ingredients: List<Ingredient>,
-    steps: List<Step>
+    steps: List<Step>,
+    S: com.example.pullit.ui.AppStrings
 ) {
     val text = buildString {
         appendLine(recipe.title)
         recipe.desc?.takeIf { it.isNotBlank() }?.let { appendLine(it) }
         appendLine()
         recipe.cookTime?.takeIf { it.isNotBlank() }?.let { appendLine("\u23F1 $it") }
-        appendLine("\uD83D\uDCCB \u98DF\u6750")  // 📋 食材
+        appendLine("\uD83D\uDCCB ${S.ingredients}")
         for (ing in ingredients) {
             appendLine("\u2022 ${ing.name} ${ing.amount}")
         }
         appendLine()
-        appendLine("\uD83D\uDC69\u200D\uD83C\uDF73 \u6B65\u9AA4")  // 👩‍🍳 步骤
+        appendLine("\uD83D\uDC69\u200D\uD83C\uDF73 ${S.steps}")
         for (step in steps) {
             appendLine("${step.order}. ${step.instruction}")
         }
         recipe.sourceUrl?.takeIf { it.isNotBlank() && !it.startsWith("local:") }?.let {
             appendLine()
-            append("\u6765\u6E90: $it")  // 来源:
+            append("${S.shareSource}: $it")
         }
         appendLine()
         append("\u2014 Pullit Recipes")
@@ -1304,4 +1330,97 @@ private fun renderRecipeCardBitmap(
     c.drawText("Pullit Recipes", width - pad - fw, y + footP.textSize, footP)
 
     return bmp
+}
+
+/**
+ * Read-only image grid for step images.
+ * Layout: 1→full width, 2→side by side, 3→top full + 2 bottom, 4→2×2 grid
+ */
+@Composable
+private fun StepImageDisplayGrid(imageUrls: List<String>) {
+    val shape = RoundedCornerShape(10.dp)
+    when (imageUrls.size) {
+        1 -> {
+            AsyncImage(
+                model = imageUrls[0],
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .clip(shape)
+            )
+        }
+        2 -> {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                imageUrls.forEach { url ->
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(130.dp)
+                            .clip(shape)
+                    )
+                }
+            }
+        }
+        3 -> {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                AsyncImage(
+                    model = imageUrls[0],
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .clip(shape)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (i in 1..2) {
+                        AsyncImage(
+                            model = imageUrls[i],
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(110.dp)
+                                .clip(shape)
+                        )
+                    }
+                }
+            }
+        }
+        4 -> {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (i in 0..1) {
+                        AsyncImage(
+                            model = imageUrls[i],
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(110.dp)
+                                .clip(shape)
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (i in 2..3) {
+                        AsyncImage(
+                            model = imageUrls[i],
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(110.dp)
+                                .clip(shape)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }

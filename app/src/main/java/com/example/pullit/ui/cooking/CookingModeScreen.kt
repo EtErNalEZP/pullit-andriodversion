@@ -6,8 +6,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -27,6 +29,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.pullit.data.local.AppDatabase
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.*
 import com.example.pullit.viewmodel.CookingModeViewModel
@@ -199,7 +204,9 @@ fun CookingModeScreen(
                 if (page in steps.indices) {
                     val step = steps[page]
                     Column(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState()),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
@@ -230,6 +237,12 @@ fun CookingModeScreen(
                             lineHeight = 30.sp,
                             modifier = Modifier.padding(horizontal = 8.dp)
                         )
+
+                        // Step images
+                        if (step.imageUrls.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(20.dp))
+                            CookingStepImages(step.imageUrls)
+                        }
                     }
                 }
             }
@@ -382,6 +395,107 @@ fun CookingModeScreen(
                                 tint = Color.White
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CookingStepImages(imageUrls: List<String>) {
+    val shape = RoundedCornerShape(12.dp)
+    when (imageUrls.size) {
+        1 -> {
+            AsyncImage(
+                model = imageUrls[0],
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .clip(shape)
+            )
+        }
+        2 -> {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                imageUrls.forEach { url ->
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(150.dp)
+                            .clip(shape)
+                    )
+                }
+            }
+        }
+        3 -> {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                AsyncImage(
+                    model = imageUrls[0],
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .clip(shape)
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    for (i in 1..2) {
+                        AsyncImage(
+                            model = imageUrls[i],
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(120.dp)
+                                .clip(shape)
+                        )
+                    }
+                }
+            }
+        }
+        4 -> {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    for (i in 0..1) {
+                        AsyncImage(
+                            model = imageUrls[i],
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(120.dp)
+                                .clip(shape)
+                        )
+                    }
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    for (i in 2..3) {
+                        AsyncImage(
+                            model = imageUrls[i],
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(120.dp)
+                                .clip(shape)
+                        )
                     }
                 }
             }

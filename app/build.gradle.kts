@@ -19,12 +19,17 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "API_BASE_URL", "\"https://pullitapi-development.up.railway.app\"")
+        }
         release {
+            signingConfig = signingConfigs.getByName("debug") // allow running release on emulator
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField("String", "API_BASE_URL", "\"https://pullitapi-production.up.railway.app\"")
         }
     }
     compileOptions {
