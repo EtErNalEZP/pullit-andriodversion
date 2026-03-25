@@ -115,7 +115,7 @@ fun CookbookDetailScreen(
                 }
             }
         } else {
-            // Recipe grid matching iOS CookbookDetailView
+            // Recipe grid
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 modifier = Modifier

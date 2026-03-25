@@ -3,6 +3,7 @@ package com.example.pullit.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.pullit.data.AppSettings
 import com.example.pullit.data.local.AppDatabase
 import com.example.pullit.data.model.Cookbook
 import com.example.pullit.data.model.Nutrition
@@ -59,13 +60,24 @@ class RecipeListViewModel(application: Application) : AndroidViewModel(applicati
     private val db = AppDatabase.getInstance(application)
     private val recipeDao = db.recipeDao()
     private val cookbookDao = db.cookbookDao()
+    private val appSettings = AppSettings.getInstance(application)
     private val json = Json { ignoreUnknownKeys = true }
 
     val recipes: StateFlow<List<Recipe>> = recipeDao.getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val cookbooks: StateFlow<List<Cookbook>> = cookbookDao.getAll()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val cookbooks: StateFlow<List<Cookbook>> = combine(
+        cookbookDao.getAll(),
+        appSettings.cookbookOrder
+    ) { all, order ->
+        if (order == null) all
+        else {
+            val map = all.associateBy { it.id }
+            val ordered = order.mapNotNull { map[it] }
+            val remaining = all.filter { it.id !in order }
+            ordered + remaining
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -238,6 +250,10 @@ class RecipeListViewModel(application: Application) : AndroidViewModel(applicati
 
     fun deleteCookbook(cookbook: Cookbook) = viewModelScope.launch {
         cookbookDao.delete(cookbook)
+    }
+
+    fun reorderCookbooks(orderedIds: List<String>) {
+        appSettings.setCookbookOrder(orderedIds)
     }
 
     fun addRecipeToCookbook(recipeId: String, cookbookId: String) = viewModelScope.launch {

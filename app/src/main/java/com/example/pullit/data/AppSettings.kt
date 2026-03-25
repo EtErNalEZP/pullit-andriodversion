@@ -58,6 +58,18 @@ class AppSettings private constructor(private val prefs: SharedPreferences) {
         _autoCookbookRecommend.value = value
     }
 
+    private val _cookbookOrder = MutableStateFlow<List<String>?>(
+        prefs.getString("cookbookOrder", null)
+            ?.split(",")
+            ?.filter { it.isNotEmpty() }
+    )
+    val cookbookOrder: StateFlow<List<String>?> = _cookbookOrder.asStateFlow()
+
+    fun setCookbookOrder(ids: List<String>) {
+        prefs.edit().putString("cookbookOrder", ids.joinToString(",")).apply()
+        _cookbookOrder.value = ids
+    }
+
     companion object {
         @Volatile
         private var instance: AppSettings? = null

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.FlowRow
@@ -25,7 +26,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -930,7 +934,16 @@ private fun CookbookListContent(
     var showCreateDialog by remember { mutableStateOf(false) }
     var newCookbookTitle by remember { mutableStateOf("") }
 
-    if (cookbooks.isEmpty()) {
+    // Drag-to-reorder state
+    val orderedCookbooks = remember(cookbooks) {
+        mutableStateListOf<com.example.pullit.data.model.Cookbook>().also { it.addAll(cookbooks) }
+    }
+    LaunchedEffect(cookbooks) { orderedCookbooks.clear(); orderedCookbooks.addAll(cookbooks) }
+    val listState = rememberLazyListState()
+    var draggingKey by remember { mutableStateOf<String?>(null) }
+    var draggingOffset by remember { mutableFloatStateOf(0f) }
+
+    if (orderedCookbooks.isEmpty()) {
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -975,21 +988,68 @@ private fun CookbookListContent(
         }
     } else {
         LazyColumn(
+            state = listState,
             contentPadding = PaddingValues(bottom = 80.dp)
         ) {
-            items(cookbooks, key = { it.id }) { cookbook ->
+            items(orderedCookbooks, key = { it.id }) { cookbook ->
                 val recipes = viewModel.recipesForCookbook(cookbook)
                 val favoriteCount = recipes.count { it.favorited }
+                val isDragging = cookbook.id == draggingKey
 
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .zIndex(if (isDragging) 1f else 0f)
+                        .graphicsLayer {
+                            translationY = if (isDragging) draggingOffset else 0f
+                            shadowElevation = if (isDragging) 20f else 0f
+                        }
+                        .background(MaterialTheme.colorScheme.background)
+                        .pointerInput(cookbook.id) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    draggingKey = cookbook.id
+                                    draggingOffset = 0f
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    draggingOffset += dragAmount.y
+                                    val currentIdx = orderedCookbooks.indexOfFirst { it.id == draggingKey }
+                                    if (currentIdx < 0) return@detectDragGesturesAfterLongPress
+                                    val visibleItems = listState.layoutInfo.visibleItemsInfo
+                                    val draggingInfo = visibleItems.firstOrNull { it.key == draggingKey }
+                                        ?: return@detectDragGesturesAfterLongPress
+                                    val draggingCenter = draggingInfo.offset + draggingOffset + draggingInfo.size / 2f
+                                    val targetInfo = visibleItems.firstOrNull { item ->
+                                        item.key != draggingKey &&
+                                        item.index < orderedCookbooks.size &&
+                                        draggingCenter >= item.offset && draggingCenter <= item.offset + item.size
+                                    } ?: return@detectDragGesturesAfterLongPress
+                                    val targetIdx = targetInfo.index
+                                    if (targetIdx != currentIdx) {
+                                        orderedCookbooks.add(targetIdx, orderedCookbooks.removeAt(currentIdx))
+                                        draggingOffset += if (targetIdx > currentIdx) -targetInfo.size.toFloat() else targetInfo.size.toFloat()
+                                    }
+                                },
+                                onDragEnd = {
+                                    draggingKey = null
+                                    draggingOffset = 0f
+                                    viewModel.reorderCookbooks(orderedCookbooks.map { it.id })
+                                },
+                                onDragCancel = {
+                                    draggingKey = null
+                                    draggingOffset = 0f
+                                }
+                            )
+                        }
                         .clickable { onCookbookTap(cookbook.id) }
                         .padding(vertical = 12.dp)
                 ) {
-                    // Title row with counts
+                    // Title row with counts + drag handle
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -1000,7 +1060,7 @@ private fun CookbookListContent(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
@@ -1037,6 +1097,12 @@ private fun CookbookListContent(
                                     )
                                 }
                             }
+                            Icon(
+                                Icons.Default.DragHandle,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = TextTertiary.copy(alpha = 0.6f)
+                            )
                         }
                     }
 
@@ -1046,7 +1112,9 @@ private fun CookbookListContent(
                     if (recipes.isNotEmpty()) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
                         ) {
                             val previewCount = 5
                             for (index in 0 until previewCount) {
