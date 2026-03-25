@@ -5,8 +5,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pullit.data.local.AppDatabase
 import com.example.pullit.data.model.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 class MealPlanViewModel(application: Application) : AndroidViewModel(application) {
@@ -37,34 +39,38 @@ class MealPlanViewModel(application: Application) : AndroidViewModel(application
     fun clearMealPlan() = viewModelScope.launch { mealPlanDao.deleteAll() }
 
     fun generateGroceryList() = viewModelScope.launch {
-        groceryDao.deleteAll()
-        val items = mealPlanItems.value
-        val ingredientMap = mutableMapOf<String, MutableList<String>>()
+        withContext(Dispatchers.IO) {
+            groceryDao.deleteAll()
+            val items = mealPlanItems.value
+            val recipeIds = items.map { it.recipeId }
+            val allRecipes = recipes.value.associateBy { it.id }
+            val ingredientMap = mutableMapOf<String, MutableList<String>>()
 
-        for (item in items) {
-            val recipe = recipeDao.getById(item.recipeId) ?: continue
-            val ingredients: List<Ingredient> = recipe.ingredientsJson?.let {
-                runCatching { json.decodeFromString<List<Ingredient>>(it) }.getOrDefault(emptyList())
-            } ?: emptyList()
+            for (item in items) {
+                val recipe = allRecipes[item.recipeId] ?: continue
+                val ingredients: List<Ingredient> = recipe.ingredientsJson?.let {
+                    runCatching { json.decodeFromString<List<Ingredient>>(it) }.getOrDefault(emptyList())
+                } ?: emptyList()
 
-            for (ing in ingredients) {
-                val key = ing.name.lowercase().trim()
-                if (key.isNotBlank()) {
-                    ingredientMap.getOrPut(key) { mutableListOf() }
-                    ingredientMap[key]!!.add("${ing.amount} (${recipe.title})")
+                for (ing in ingredients) {
+                    val key = ing.name.lowercase().trim()
+                    if (key.isNotBlank()) {
+                        ingredientMap.getOrPut(key) { mutableListOf() }
+                        ingredientMap[key]!!.add("${ing.amount} (${recipe.title})")
+                    }
                 }
             }
-        }
 
-        val groceries = ingredientMap.map { (name, amounts) ->
-            GroceryItem(
-                id = "gi_${System.currentTimeMillis()}_${name.hashCode()}",
-                name = name.replaceFirstChar { it.uppercase() },
-                amount = amounts.joinToString(", "),
-                fromRecipesJson = json.encodeToString<List<String>>(amounts)
-            )
+            val groceries = ingredientMap.map { (name, amounts) ->
+                GroceryItem(
+                    id = "gi_${System.currentTimeMillis()}_${name.hashCode()}",
+                    name = name.replaceFirstChar { it.uppercase() },
+                    amount = amounts.joinToString(", "),
+                    fromRecipesJson = json.encodeToString<List<String>>(amounts)
+                )
+            }
+            groceryDao.upsertAll(groceries)
         }
-        groceryDao.upsertAll(groceries)
     }
 
     fun toggleGroceryChecked(item: GroceryItem) = viewModelScope.launch {

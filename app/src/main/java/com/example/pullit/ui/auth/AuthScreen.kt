@@ -211,6 +211,7 @@ fun AuthScreen(
                                 authManager.signIn(email.trim(), password)
                             }
                         } catch (e: Exception) {
+                            android.util.Log.e("AuthScreen", "Auth error: ${e::class.simpleName}: ${e.message}", e)
                             errorMessage = friendlyAuthError(e, S)
                         }
                         isLoading = false

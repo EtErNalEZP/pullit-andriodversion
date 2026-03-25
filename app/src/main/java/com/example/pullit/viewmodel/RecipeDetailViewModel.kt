@@ -7,8 +7,10 @@ import com.example.pullit.data.local.AppDatabase
 import com.example.pullit.data.model.Cookbook
 import com.example.pullit.data.model.MealPlanItem
 import com.example.pullit.data.model.Recipe
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 class RecipeDetailViewModel(application: Application) : AndroidViewModel(application) {
@@ -28,24 +30,25 @@ class RecipeDetailViewModel(application: Application) : AndroidViewModel(applica
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun loadRecipe(id: String) = viewModelScope.launch {
-        _recipe.value = recipeDao.getById(id)
-        _isInMealPlan.value = mealPlanDao.existsByRecipeId(id)
+        val loaded = withContext(Dispatchers.IO) { recipeDao.getById(id) }
+        _recipe.value = loaded
+        _isInMealPlan.value = withContext(Dispatchers.IO) { mealPlanDao.existsByRecipeId(id) }
     }
 
     fun toggleFavorite() = viewModelScope.launch {
         val r = _recipe.value ?: return@launch
         val updated = r.copy(favorited = !r.favorited)
-        recipeDao.upsert(updated)
+        withContext(Dispatchers.IO) { recipeDao.upsert(updated) }
         _recipe.value = updated
     }
 
     fun updateRecipe(recipe: Recipe) = viewModelScope.launch {
-        recipeDao.upsert(recipe)
+        withContext(Dispatchers.IO) { recipeDao.upsert(recipe) }
         _recipe.value = recipe
     }
 
     fun deleteRecipe() = viewModelScope.launch {
-        _recipe.value?.let { recipeDao.delete(it) }
+        _recipe.value?.let { withContext(Dispatchers.IO) { recipeDao.delete(it) } }
     }
 
     fun addToMealPlan() = viewModelScope.launch {

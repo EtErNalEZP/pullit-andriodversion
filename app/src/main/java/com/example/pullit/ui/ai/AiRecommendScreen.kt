@@ -26,7 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.pullit.data.model.RecipeSuggestion
@@ -53,10 +55,13 @@ fun AiRecommendScreen(
     var newIngredient by remember { mutableStateOf("") }
     var selectedSuggestionIndex by remember { mutableIntStateOf(-1) }
 
+    val scope = rememberCoroutineScope()
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
-            val bytes = context.contentResolver.openInputStream(it)?.readBytes()
-            if (bytes != null) viewModel.analyzeImage(bytes)
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val bytes = context.contentResolver.openInputStream(it)?.readBytes()
+                if (bytes != null) viewModel.analyzeImage(bytes)
+            }
         }
     }
 

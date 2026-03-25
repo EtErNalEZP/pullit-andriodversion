@@ -38,6 +38,7 @@ class AuthManager {
 
     suspend fun initialize() {
         try {
+            supabase.auth.awaitInitialization()
             val session = supabase.auth.currentSessionOrNull()
             if (session != null) {
                 _userId.value = session.user?.id
