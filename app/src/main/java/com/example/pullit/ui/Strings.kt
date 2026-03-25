@@ -2,6 +2,17 @@ package com.example.pullit.ui
 
 import androidx.compose.runtime.compositionLocalOf
 
+data class ImportErrorStrings(
+    val importFailed: String,
+    val importErrorNotRecipe: String,
+    val importErrorNotRecipeHint: String,
+    val importErrorNetwork: String,
+    val importErrorTimeout: String,
+    val importErrorUnknown: String,
+    val importTryText: String,
+    val importTryImage: String,
+)
+
 data class AppStrings(
     // ── Common ──
     val cancel: String,
@@ -119,6 +130,10 @@ data class AppStrings(
     val douyin: String,
     val xiachufang: String,
     val pinterest: String,
+    val bilibili: String,
+    val recipeSource: String,
+    val newBadge: String,
+    val shareSource: String,
     val pasteLink: String,
     val paste: String,
     val orImportFrom: String,
@@ -130,6 +145,7 @@ data class AppStrings(
     val changeImage: String,
     val chooseImage: String,
     val selectedImage: String,
+    val importErrors: ImportErrorStrings,
 
     // ── Meal Plan ──
     val weeklyPlan: String,
@@ -198,6 +214,7 @@ data class AppStrings(
     // ── Cooking Mode ──
     val setTimer: String,
     val minutes: String,
+    val hours: String,
     val seconds: String,
     val start: String,
     val pause: String,
@@ -392,6 +409,10 @@ val EnglishStrings = AppStrings(
     douyin = "Douyin",
     xiachufang = "Xiachufang",
     pinterest = "Pinterest",
+    bilibili = "Bilibili",
+    recipeSource = "Recipe",
+    newBadge = "NEW",
+    shareSource = "Source",
     pasteLink = "Paste link or share text here...",
     paste = "Paste",
     orImportFrom = "Or Import From",
@@ -403,6 +424,16 @@ val EnglishStrings = AppStrings(
     changeImage = "Change Image",
     chooseImage = "Choose Image",
     selectedImage = "Selected image",
+    importErrors = ImportErrorStrings(
+        importFailed = "Import failed",
+        importErrorNotRecipe = "Doesn't look like a recipe",
+        importErrorNotRecipeHint = "The content at this link isn't a recipe. Try pasting the text directly or uploading a photo instead.",
+        importErrorNetwork = "Connection failed. Please check your internet and try again.",
+        importErrorTimeout = "This is taking too long. Please try again.",
+        importErrorUnknown = "Something went wrong. Please try again.",
+        importTryText = "Paste Text",
+        importTryImage = "Upload Photo",
+    ),
     weeklyPlan = "Weekly Plan",
     groceryList = "Grocery List",
     startPlanning = "Start Planning",
@@ -460,7 +491,8 @@ val EnglishStrings = AppStrings(
     tapToSpin = "Tap to Spin",
     spinToPick = "Spin to pick!",
     setTimer = "Set Timer",
-    minutes = "Minutes",
+    minutes = "min",
+    hours = "hr",
     seconds = "Seconds",
     start = "Start",
     pause = "Pause",
@@ -641,6 +673,10 @@ val ChineseStrings = AppStrings(
     douyin = "抖音",
     xiachufang = "下厨房",
     pinterest = "Pinterest",
+    bilibili = "B站",
+    recipeSource = "食谱",
+    newBadge = "新",
+    shareSource = "来源",
     pasteLink = "粘贴链接或分享文字...",
     paste = "粘贴",
     orImportFrom = "或从以下导入",
@@ -652,6 +688,16 @@ val ChineseStrings = AppStrings(
     changeImage = "更换图片",
     chooseImage = "选择图片",
     selectedImage = "已选图片",
+    importErrors = ImportErrorStrings(
+        importFailed = "导入失败",
+        importErrorNotRecipe = "该内容不像是食谱",
+        importErrorNotRecipeHint = "这个链接的内容不是食谱。试试直接粘贴文字，或者上传一张图片。",
+        importErrorNetwork = "网络连接失败，请检查网络后重试。",
+        importErrorTimeout = "请求超时，请稍后重试。",
+        importErrorUnknown = "出了点问题，请重试。",
+        importTryText = "粘贴文字",
+        importTryImage = "上传图片",
+    ),
     weeklyPlan = "每周计划",
     groceryList = "购物清单",
     startPlanning = "开始计划",
@@ -710,6 +756,7 @@ val ChineseStrings = AppStrings(
     spinToPick = "转一转选食谱！",
     setTimer = "设置计时器",
     minutes = "分钟",
+    hours = "小时",
     seconds = "秒",
     start = "开始",
     pause = "暂停",

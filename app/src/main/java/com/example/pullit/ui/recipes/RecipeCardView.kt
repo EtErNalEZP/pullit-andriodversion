@@ -25,26 +25,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.example.pullit.data.model.Recipe
+import com.example.pullit.ui.AppStrings
+import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.Primary
 import com.example.pullit.ui.theme.TextTertiary
 
-/**
- * Determines the source platform display string based on the recipe's sourceUrl.
- */
-private fun sourcePlatformLabel(sourceUrl: String?): String {
-    if (sourceUrl == null) return "\uD83C\uDF7D\uFE0F Recipe"
+private fun sourcePlatformLabel(sourceUrl: String?, S: AppStrings): String {
+    if (sourceUrl == null) return "\uD83C\uDF7D\uFE0F ${S.recipeSource}"
     val lower = sourceUrl.lowercase()
     return when {
-        lower.contains("xiaohongshu.com") || lower.contains("xhslink") -> "\uD83D\uDCD5 \u5C0F\u7EA2\u4E66"
-        lower.contains("douyin.com") -> "\uD83C\uDFB5 \u6296\u97F3"
-        lower.contains("bilibili.com") || lower.contains("b23.tv") -> "\uD83D\uDCFA B\u7AD9"
-        lower.contains("xiachufang.com") -> "\uD83C\uDF73 \u4E0B\u53A8\u623F"
+        lower.contains("xiaohongshu.com") || lower.contains("xhslink") -> "\uD83D\uDCD5 ${S.xiaohongshu}"
+        lower.contains("douyin.com") -> "\uD83C\uDFB5 ${S.douyin}"
+        lower.contains("bilibili.com") || lower.contains("b23.tv") -> "\uD83D\uDCFA ${S.bilibili}"
+        lower.contains("xiachufang.com") -> "\uD83C\uDF73 ${S.xiachufang}"
         lower.contains("tiktok.com") -> "\uD83C\uDFB5 TikTok"
         lower.contains("instagram.com") -> "\uD83D\uDCF7 Instagram"
         lower.contains("youtube.com") || lower.contains("youtu.be") -> "\u25B6\uFE0F YouTube"
-        else -> "\uD83C\uDF7D\uFE0F Recipe"
+        lower.contains("pinterest.com") || lower.contains("pin.it") -> "\uD83D\uDCCC ${S.pinterest}"
+        else -> "\uD83C\uDF7D\uFE0F ${S.recipeSource}"
     }
 }
+
+private fun localizedCookTime(cookTime: String, S: AppStrings): String =
+    cookTime
+        .replace(Regex("\\bhours?\\b", RegexOption.IGNORE_CASE), S.hours)
+        .replace(Regex("\\bmins?\\b", RegexOption.IGNORE_CASE), S.minutes)
+        .replace(Regex("\\bminutes?\\b", RegexOption.IGNORE_CASE), S.minutes)
 
 @Composable
 fun RecipeCardView(
@@ -54,6 +60,7 @@ fun RecipeCardView(
     isSelected: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val S = LocalStrings.current
     val cardShape = RoundedCornerShape(16.dp)
 
     Surface(
@@ -144,7 +151,7 @@ fun RecipeCardView(
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = "\uD83D\uDD50 ${recipe.cookTime}",
+                            text = "\uD83D\uDD50 ${localizedCookTime(recipe.cookTime!!, S)}",
                             color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
@@ -180,7 +187,7 @@ fun RecipeCardView(
                 ) {
                     // Left: Source platform indicator
                     Text(
-                        text = sourcePlatformLabel(recipe.sourceUrl),
+                        text = sourcePlatformLabel(recipe.sourceUrl, S),
                         fontSize = 11.sp,
                         color = TextTertiary,
                         maxLines = 1
