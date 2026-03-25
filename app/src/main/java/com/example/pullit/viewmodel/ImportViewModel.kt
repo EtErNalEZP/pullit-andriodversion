@@ -14,6 +14,7 @@ import kotlinx.serialization.json.Json
 import java.util.UUID
 
 enum class ImportMethod { LINK, TEXT, IMAGE }
+enum class ImportErrorType { NOT_RECIPE, NETWORK, TIMEOUT, UNKNOWN }
 
 class ImportViewModel(application: Application) : AndroidViewModel(application) {
     private val db = AppDatabase.getInstance(application)
@@ -36,6 +37,9 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    private val _errorType = MutableStateFlow<ImportErrorType?>(null)
+    val errorType: StateFlow<ImportErrorType?> = _errorType.asStateFlow()
+
     private val _generatedRecipe = MutableStateFlow<Recipe?>(null)
     val generatedRecipe: StateFlow<Recipe?> = _generatedRecipe.asStateFlow()
 
@@ -47,7 +51,34 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
 
     fun setInputText(text: String) { _inputText.value = text }
     fun setImportMethod(method: ImportMethod) { _importMethod.value = method }
-    fun clearError() { _error.value = null }
+    fun clearError() { _error.value = null; _errorType.value = null }
+
+    private fun classifyError(e: Exception): ImportErrorType {
+        val msg = e.message?.lowercase() ?: ""
+        return when {
+            e is ApiError.Timeout -> ImportErrorType.TIMEOUT
+            e is ApiError.NetworkError -> ImportErrorType.NETWORK
+            e is ApiError.HttpError && e.code in 500..599 -> ImportErrorType.UNKNOWN
+            msg.contains("not a recipe") || msg.contains("not food") ||
+            msg.contains("no recipe") || msg.contains("不是食谱") ||
+            msg.contains("content is not") || msg.contains("not contain") ||
+            msg.contains("unable to extract") -> ImportErrorType.NOT_RECIPE
+            msg.contains("network") || msg.contains("connect") ||
+            msg.contains("dns") || msg.contains("unreachable") -> ImportErrorType.NETWORK
+            else -> ImportErrorType.UNKNOWN
+        }
+    }
+
+    private fun setError(e: Exception, fallbackMsg: String) {
+        _errorType.value = classifyError(e)
+        _error.value = when (e) {
+            is ApiError.HttpError -> "HTTP ${e.code}: ${e.msg}"
+            is ApiError.NetworkError -> e.cause?.message ?: fallbackMsg
+            is ApiError.DecodingError -> e.cause?.message ?: fallbackMsg
+            is ApiError.Timeout -> "Timeout"
+            else -> e.message ?: fallbackMsg
+        }
+    }
 
     fun detectPlatform(text: String): String {
         val lower = text.lowercase()
@@ -89,15 +120,8 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
             Log.d("ImportVM", "Import success: ${_generatedRecipe.value?.title}")
         } catch (e: Exception) {
             Log.e("ImportVM", "Import failed", e)
-            val errorMsg = when (e) {
-                is ApiError.HttpError -> "HTTP ${e.code}: ${e.msg}"
-                is ApiError.NetworkError -> "Network error: ${e.cause?.message}"
-                is ApiError.DecodingError -> "Decode error: ${e.cause?.message}"
-                is ApiError.Timeout -> "Request timed out"
-                else -> "${e::class.simpleName}: ${e.message}"
-            }
-            _error.value = errorMsg
-            BackgroundGenerationState.fail(taskId, errorMsg ?: "Unknown error")
+            setError(e, "Import failed")
+            BackgroundGenerationState.fail(taskId, _error.value ?: "Unknown error")
         }
     }
 
@@ -201,8 +225,8 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
             val settings = AppSettings.getInstance(getApplication())
             BackgroundGenerationState.complete(taskId, recipe, settings.autoCookbookRecommend.value)
         } catch (e: Exception) {
-            _error.value = e.message ?: "Parse failed"
-            BackgroundGenerationState.fail(taskId, e.message ?: "Parse failed")
+            setError(e, "Parse failed")
+            BackgroundGenerationState.fail(taskId, _error.value ?: "Parse failed")
         }
     }
 
@@ -219,8 +243,8 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
             val settings = AppSettings.getInstance(getApplication())
             BackgroundGenerationState.complete(taskId, recipe, settings.autoCookbookRecommend.value)
         } catch (e: Exception) {
-            _error.value = e.message ?: "Image import failed"
-            BackgroundGenerationState.fail(taskId, e.message ?: "Image import failed")
+            setError(e, "Image import failed")
+            BackgroundGenerationState.fail(taskId, _error.value ?: "Image import failed")
         }
     }
 
@@ -228,6 +252,7 @@ class ImportViewModel(application: Application) : AndroidViewModel(application) 
         _inputText.value = ""
         _progress.value = null
         _error.value = null
+        _errorType.value = null
         _generatedRecipe.value = null
         _pendingTitle.value = null
         _pendingCoverUrl.value = null

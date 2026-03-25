@@ -30,9 +30,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.painterResource
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.pullit.R
 import com.example.pullit.ui.LocalStrings
 import com.example.pullit.ui.theme.*
+import com.example.pullit.viewmodel.ImportErrorType
 import com.example.pullit.viewmodel.ImportMethod
 import com.example.pullit.viewmodel.ImportViewModel
 
@@ -49,17 +53,23 @@ fun ImportSheet(
     val isGenerating by importViewModel.isGenerating.collectAsState()
     val canStartNew = !isGenerating || com.example.pullit.viewmodel.BackgroundGenerationState.canStartNew
     val error by importViewModel.error.collectAsState()
+    val errorType by importViewModel.errorType.collectAsState()
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var selectedImageBytes by remember { mutableStateOf<ByteArray?>(null) }
 
+    val importScope = rememberCoroutineScope()
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let {
             selectedImageUri = it
-            val bytes = context.contentResolver.openInputStream(it)?.readBytes()
-            selectedImageBytes = bytes
+            importScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val bytes = context.contentResolver.openInputStream(it)?.readBytes()
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    selectedImageBytes = bytes
+                }
+            }
         }
     }
 
@@ -204,43 +214,21 @@ fun ImportSheet(
             )
         }
 
-        // Error display
-        error?.let {
-            Spacer(modifier = Modifier.height(16.dp))
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = Error.copy(alpha = 0.1f)
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Outlined.ErrorOutline,
-                        contentDescription = null,
-                        tint = Error,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        it,
-                        color = Error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        Icons.Outlined.Close,
-                        contentDescription = "Dismiss",
-                        tint = Error,
-                        modifier = Modifier
-                            .size(18.dp)
-                            .clickable { importViewModel.clearError() }
-                    )
+        // Error display — NOT_RECIPE stays until dismissed; others auto-dismiss after 5s
+        if (error != null) {
+            LaunchedEffect(error) {
+                if (errorType != ImportErrorType.NOT_RECIPE) {
+                    kotlinx.coroutines.delay(5000)
+                    importViewModel.clearError()
                 }
             }
+            Spacer(modifier = Modifier.height(16.dp))
+            ImportErrorCard(
+                errorType = errorType,
+                onDismiss = { importViewModel.clearError() },
+                onSwitchToText = { importViewModel.setImportMethod(ImportMethod.TEXT) },
+                onSwitchToImage = { importViewModel.setImportMethod(ImportMethod.IMAGE) }
+            )
         }
     }
 }
@@ -408,7 +396,7 @@ private fun LinkTab(
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                platformDisplayName(detectedPlatform),
+                platformDisplayName(detectedPlatform, S),
                 style = MaterialTheme.typography.labelMedium,
                 color = Success,
                 fontWeight = FontWeight.Medium
@@ -695,14 +683,96 @@ private fun LabeledDivider(label: String) {
     }
 }
 
-private fun platformDisplayName(platform: String): String = when (platform) {
-    "xiaohongshu" -> "\u5C0F\u7EA2\u4E66 (Xiaohongshu)"
-    "douyin" -> "\u6296\u97F3 (Douyin)"
-    "bilibili" -> "Bilibili"
-    "xiachufang" -> "\u4E0B\u53A8\u623F (Xiachufang)"
+@Composable
+private fun ImportErrorCard(
+    errorType: ImportErrorType?,
+    onDismiss: () -> Unit,
+    onSwitchToText: () -> Unit,
+    onSwitchToImage: () -> Unit
+) {
+    val S = LocalStrings.current
+    val isNotRecipe = errorType == ImportErrorType.NOT_RECIPE
+
+    val containerColor = if (isNotRecipe)
+        MaterialTheme.colorScheme.secondaryContainer
+    else
+        Error.copy(alpha = 0.1f)
+    val iconTint = if (isNotRecipe) MaterialTheme.colorScheme.secondary else Error
+    val icon = if (isNotRecipe) Icons.Outlined.Info else Icons.Outlined.ErrorOutline
+
+    val message = when (errorType) {
+        ImportErrorType.NOT_RECIPE -> S.importErrors.importErrorNotRecipe
+        ImportErrorType.NETWORK -> S.importErrors.importErrorNetwork
+        ImportErrorType.TIMEOUT -> S.importErrors.importErrorTimeout
+        else -> S.importErrors.importErrorUnknown
+    }
+    val hint = if (isNotRecipe) S.importErrors.importErrorNotRecipeHint else null
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    message,
+                    color = if (isNotRecipe) MaterialTheme.colorScheme.onSecondaryContainer else Error,
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    Icons.Outlined.Close,
+                    contentDescription = "Dismiss",
+                    tint = if (isNotRecipe) MaterialTheme.colorScheme.onSecondaryContainer else Error,
+                    modifier = Modifier.size(18.dp).clickable { onDismiss() }
+                )
+            }
+            if (hint != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    hint,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.75f),
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { onDismiss(); onSwitchToText() },
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Outlined.TextFields, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(S.importErrors.importTryText, style = MaterialTheme.typography.labelMedium)
+                    }
+                    OutlinedButton(
+                        onClick = { onDismiss(); onSwitchToImage() },
+                        modifier = Modifier.weight(1f).height(36.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Icon(Icons.Outlined.CameraAlt, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(S.importErrors.importTryImage, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun platformDisplayName(platform: String, S: com.example.pullit.ui.AppStrings): String = when (platform) {
+    "xiaohongshu" -> S.xiaohongshu
+    "douyin" -> S.douyin
+    "bilibili" -> S.bilibili
+    "xiachufang" -> S.xiachufang
     "tiktok" -> "TikTok"
     "instagram" -> "Instagram"
     "youtube" -> "YouTube"
-    "pinterest" -> "Pinterest"
+    "pinterest" -> S.pinterest
     else -> platform
 }

@@ -736,11 +736,35 @@ private fun GeneratingRecipeCard(
 ) {
     val S = LocalStrings.current
     val cardShape = RoundedCornerShape(16.dp)
-    val isCompleted = generatedRecipe != null && !isGenerating
+    val isError = progress?.status == com.example.pullit.data.model.RecipeGenerationProgress.Status.ERROR
+    val isCompleted = generatedRecipe != null && !isGenerating && !isError
+
+    // Auto-dismiss error card after 4 seconds
+    LaunchedEffect(isError) {
+        if (isError) {
+            kotlinx.coroutines.delay(4000)
+            onTap()
+        }
+    }
+
+    // Map raw backend error message to a user-friendly localized string
+    val errorMessage = if (isError) {
+        val raw = progress?.message?.lowercase() ?: ""
+        when {
+            raw.contains("not a recipe") || raw.contains("not food") ||
+            raw.contains("no recipe") || raw.contains("unable to extract") ||
+            raw.contains("content is not") -> S.importErrors.importErrorNotRecipe
+            raw.contains("network") || raw.contains("connect") ||
+            raw.contains("dns") || raw.contains("unreachable") -> S.importErrors.importErrorNetwork
+            raw.contains("timeout") || raw.contains("timed out") -> S.importErrors.importErrorTimeout
+            else -> S.importErrors.importErrorUnknown
+        }
+    } else null
 
     // Display title: completed recipe > pending > fallback
     val displayTitle = when {
         isCompleted -> generatedRecipe!!.title
+        isError -> S.importErrors.importFailed
         !pendingTitle.isNullOrBlank() -> pendingTitle
         else -> S.generatingRecipe
     }
@@ -748,11 +772,9 @@ private fun GeneratingRecipeCard(
     // Display cover URL: completed recipe image > pending cover
     val displayCoverUrl = when {
         isCompleted && !generatedRecipe!!.imageUrl.isNullOrBlank() -> generatedRecipe.imageUrl
-        !pendingCoverUrl.isNullOrBlank() -> pendingCoverUrl
+        !isError && !pendingCoverUrl.isNullOrBlank() -> pendingCoverUrl
         else -> null
     }
-
-    val hasPreview = displayCoverUrl != null || !pendingTitle.isNullOrBlank()
 
     // Animated progress value
     var progressValue by remember { mutableFloatStateOf(0f) }
@@ -763,11 +785,9 @@ private fun GeneratingRecipeCard(
     )
 
     // Simulated progress that monotonically increases
-    LaunchedEffect(isCompleted) {
-        if (isCompleted) {
-            progressValue = 1f
-            return@LaunchedEffect
-        }
+    LaunchedEffect(isCompleted, isError) {
+        if (isCompleted) { progressValue = 1f; return@LaunchedEffect }
+        if (isError) { progressValue = 0f; return@LaunchedEffect }
         while (true) {
             kotlinx.coroutines.delay(800)
             val remaining = 0.95f - progressValue
@@ -780,9 +800,9 @@ private fun GeneratingRecipeCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(enabled = isCompleted, onClick = onTap),
+            .clickable(enabled = isCompleted || isError, onClick = onTap),
         shape = cardShape,
-        color = MaterialTheme.colorScheme.surface,
+        color = if (isError) Error.copy(alpha = 0.05f) else MaterialTheme.colorScheme.surface,
         shadowElevation = 6.dp
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -794,8 +814,14 @@ private fun GeneratingRecipeCard(
                     .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                if (displayCoverUrl != null) {
-                    // Show cover image — desaturated during generation, full color when completed
+                if (isError) {
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(Error.copy(alpha = 0.08f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("⚠️", fontSize = 40.sp)
+                    }
+                } else if (displayCoverUrl != null) {
                     AsyncImage(
                         model = displayCoverUrl,
                         contentDescription = displayTitle,
@@ -805,83 +831,48 @@ private fun GeneratingRecipeCard(
                         ),
                         modifier = Modifier.fillMaxSize()
                     )
-                    // Dim overlay during generation
                     if (!isCompleted) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.15f))
-                        )
+                        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.15f)))
                     }
                 } else if (!isCompleted) {
-                    // No cover: gradient background with toaster animation
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        Primary.copy(alpha = 0.06f),
-                                        MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                )
-                            ),
+                        modifier = Modifier.fillMaxSize().background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Primary.copy(alpha = 0.06f), MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                        ),
                         contentAlignment = Alignment.Center
                     ) {
                         MiniToasterView(modifier = Modifier.size(100.dp))
                     }
                 } else {
-                    // Completed without cover
                     Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        Primary.copy(alpha = 0.15f),
-                                        MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                )
-                            ),
+                        modifier = Modifier.fillMaxSize().background(
+                            brush = Brush.linearGradient(
+                                colors = listOf(Primary.copy(alpha = 0.15f), MaterialTheme.colorScheme.surfaceVariant)
+                            )
+                        ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Outlined.Restaurant,
-                            contentDescription = null,
-                            tint = Primary.copy(alpha = 0.3f),
-                            modifier = Modifier.size(36.dp)
-                        )
+                        Icon(Icons.Outlined.Restaurant, contentDescription = null, tint = Primary.copy(alpha = 0.3f), modifier = Modifier.size(36.dp))
                     }
                 }
 
-                // NEW badge (completed only)
                 if (isCompleted) {
                     Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .clip(RoundedCornerShape(50))
-                            .background(Primary)
+                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                            .clip(RoundedCornerShape(50)).background(Primary)
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
-                        Text(
-                            "NEW",
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text(S.newBadge, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
-                // Progress bar at bottom of image (generating only)
-                if (!isCompleted && isGenerating) {
+                if (!isCompleted && !isError && isGenerating) {
                     LinearProgressIndicator(
                         progress = { animatedProgress },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                            .height(4.dp)
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp).height(4.dp)
                             .clip(RoundedCornerShape(2.dp)),
                         color = Primary,
                         trackColor = Color.White.copy(alpha = 0.3f)
@@ -890,38 +881,37 @@ private fun GeneratingRecipeCard(
             }
 
             // Title + status section
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(10.dp)
-            ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
                 Text(
                     text = displayTitle,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = if (isCompleted) MaterialTheme.colorScheme.onSurface else TextTertiary,
+                    color = when {
+                        isError -> Error
+                        isCompleted -> MaterialTheme.colorScheme.onSurface
+                        else -> TextTertiary
+                    },
                     modifier = Modifier.defaultMinSize(minHeight = 36.dp)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                if (isCompleted) {
-                    Text(
-                        S.tapToViewRecipe,
-                        fontSize = 11.sp,
-                        color = Success,
-                        fontWeight = FontWeight.Medium
-                    )
-                } else {
-                    Text(
-                        progress?.message ?: S.processing,
-                        fontSize = 11.sp,
-                        color = TextTertiary,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                Text(
+                    text = when {
+                        isCompleted -> S.tapToViewRecipe
+                        isError -> errorMessage ?: S.importErrors.importErrorUnknown
+                        else -> progress?.message ?: S.processing
+                    },
+                    fontSize = 11.sp,
+                    color = when {
+                        isCompleted -> Success
+                        isError -> Error.copy(alpha = 0.75f)
+                        else -> TextTertiary
+                    },
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
         }
     }
